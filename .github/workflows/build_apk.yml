@@ -54,7 +54,7 @@ jobs:
           NEVES_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           NEVES_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           NEVES_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        run: flutter build apk --release --build-number=${{ github.run_number }} --android-skip-build-dependency-validation
 
       - name: Read App Version
         id: version
