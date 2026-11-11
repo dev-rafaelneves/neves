@@ -15,12 +15,16 @@ class GeminiTestResult {
 
 class GeminiService {
   static const String _keyGeminiApiKey = 'neves_gemini_api_key';
-  static const String _defaultModel = 'gemini-2.5-flash';
+  static const String _defaultModel = 'gemini-3.8-flash';
   static String _activeModel = _defaultModel;
   static const List<String> candidateModels = [
+    'gemini-3.8-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3-flash-preview',
+    'gemini-3.1-pro-preview',
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
-    'gemini-2.5-pro',
   ];
   static const String _apiBaseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models';
@@ -425,9 +429,24 @@ Exemplo de formato esperado:
         } catch (_) {}
         lastError = msg;
 
-        if (response.statusCode == 400 || response.statusCode == 403) break;
+        final lower = msg.toLowerCase();
+        if (response.statusCode == 400 &&
+            (lower.contains('api key') || lower.contains('invalid'))) {
+          break;
+        }
+        if (response.statusCode == 403) {
+          break;
+        }
+
+        continue;
       } catch (e) {
+        if (kIsWeb) {
+          throw StateError(
+            'Bloqueio de CORS do navegador. O Google Gemini bloqueia chamadas diretas de browsers. Teste no Android ou inicie o Chrome com --disable-web-security.',
+          );
+        }
         lastError = e.toString();
+        continue;
       }
     }
 
