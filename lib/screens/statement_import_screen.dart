@@ -82,6 +82,9 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
       extension: ext,
       categories: widget.appState.categories,
       existingTransactions: widget.appState.transactions,
+      goals: widget.appState.goals,
+      accounts: widget.appState.accounts,
+      sourceAccountId: _selectedAccountId,
       forceExpenseForCreditCard: _importToCard,
       invertSigns: _invertSigns,
     );
@@ -94,6 +97,22 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
 
     // Dispara categorização automática por IA caso haja chave configurada
     _runAiCategorization(silentIfNoKey: true);
+  }
+
+  Future<void> _copyMercadoPagoPrompt() async {
+    await Clipboard.setData(
+      const ClipboardData(text: ImportService.mercadoPagoAssistantPrompt),
+    );
+    HapticFeedback.mediumImpact();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Prompt copiado! Cole no Assistente Virtual do Mercado Pago para gerar o CSV.',
+        ),
+        backgroundColor: AppColors.emerald,
+      ),
+    );
   }
 
   Future<void> _runAiCategorization({bool silentIfNoKey = false}) async {
@@ -126,7 +145,12 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
       setState(() {
         mapping.forEach((idx, catId) {
           if (idx >= 0 && idx < _candidates.length) {
-            _candidates[idx].suggestedCategoryId = catId;
+            final c = _candidates[idx];
+            // Preserva categorias dedicadas de operações de Cofrinho/Transferência
+            if (!c.operationType.isCofrinho &&
+                c.operationType != StatementOperationType.transfer) {
+              c.suggestedCategoryId = catId;
+            }
           }
         });
         _isAiCategorizing = false;
@@ -152,24 +176,47 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
         candidates: _candidates,
         categories: widget.appState.categories,
         existingTransactions: widget.appState.transactions,
+        goals: widget.appState.goals,
+        accounts: widget.appState.accounts,
+        sourceAccountId: _selectedAccountId,
       );
     });
     _runAiCategorization(silentIfNoKey: true);
   }
 
-  void _toggleSingleCandidateType(ImportedTransactionCandidate c) {
+  void _changeCandidateOperation(
+    ImportedTransactionCandidate c,
+    StatementOperationType newOp,
+  ) {
     HapticFeedback.selectionClick();
     setState(() {
-      c.type = c.type == TransactionType.expense
-          ? TransactionType.income
-          : TransactionType.expense;
-      c.suggestedCategoryId = ImportService.suggestCategory(
-        title: c.title,
-        type: c.type,
+      c.operationType = newOp;
+      ImportService.applyOperationMetadata(
+        candidate: c,
         categories: widget.appState.categories,
         existingTransactions: widget.appState.transactions,
+        goals: widget.appState.goals,
+        accounts: widget.appState.accounts,
+        sourceAccountId: _selectedAccountId,
       );
     });
+  }
+
+  Color _colorForOperation(StatementOperationType op) {
+    switch (op) {
+      case StatementOperationType.expense:
+        return AppColors.rose;
+      case StatementOperationType.income:
+        return AppColors.emerald;
+      case StatementOperationType.transfer:
+        return AppColors.blue;
+      case StatementOperationType.cofrinhoDeposit:
+        return AppColors.indigoPrimary;
+      case StatementOperationType.cofrinhoWithdraw:
+        return AppColors.amber;
+      case StatementOperationType.cofrinhoYield:
+        return AppColors.indigoLight;
+    }
   }
 
   Future<void> _quickCreateNubankCard() async {
@@ -208,18 +255,36 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
           ? card.computeCompetenceMonth(item.date)
           : '${item.date.year}-${item.date.month.toString().padLeft(2, '0')}';
 
+      final tags = <String>[];
+      if (item.operationType == StatementOperationType.cofrinhoDeposit) {
+        tags.add('cofrinho_aporte');
+      } else if (item.operationType ==
+          StatementOperationType.cofrinhoWithdraw) {
+        tags.add('resgate_cofrinho');
+      } else if (item.operationType == StatementOperationType.cofrinhoYield) {
+        tags.add('rendimento_cofrinho');
+      }
+
       final tx = TransactionModel(
         id: _uuid.v4(),
         title: item.title,
         amount: item.amount,
-        type: item.type,
+        type: item.operationType.transactionType,
         date: item.date,
         competenceMonth: compMonth,
         status:
             _importToCard ? TransactionStatus.pending : TransactionStatus.paid,
         accountId: _importToCard ? null : _selectedAccountId,
+        destinationAccountId:
+            item.operationType == StatementOperationType.transfer
+                ? item.destinationAccountId
+                : null,
         cardId: _importToCard ? _selectedCardId : null,
-        categoryId: item.suggestedCategoryId,
+        categoryId: item.operationType == StatementOperationType.transfer
+            ? null
+            : item.suggestedCategoryId,
+        goalId: item.operationType.isCofrinho ? item.suggestedGoalId : null,
+        tags: tags,
         importHash: item.importHash,
       );
       await state.addOrUpdateTransaction(tx);
@@ -424,7 +489,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Suporta arquivos OFX e CSV de bancos brasileiros (Nubank, Itaú, Inter, Bradesco, C6) ou linhas copiadas de faturas em PDF.',
+                        'Identifica automaticamente Despesas, Receitas, Transferências, Dinheiro Guardado/Retirado do Cofrinho e Rendimentos (Mercado Pago, Nubank, Inter, Itaú, C6).',
                         style: TextStyle(
                           fontSize: 12.5,
                           color: isDark
@@ -467,6 +532,32 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton.icon(
+                          onPressed: _copyMercadoPagoPrompt,
+                          style: TextButton.styleFrom(
+                            backgroundColor: AppColors.indigoSoft,
+                            foregroundColor: AppColors.indigoPrimary,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                              horizontal: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: const Icon(Icons.copy_all_rounded, size: 17),
+                          label: const Text(
+                            'Copiar Prompt p/ Assistente Mercado Pago',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -556,6 +647,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                   )
                 else
                   ..._candidates.map((c) {
+                    final opColor = _colorForOperation(c.operationType);
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: Padding(
@@ -594,9 +686,26 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                                     ],
                                   ),
                                 ),
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () => _toggleSingleCandidateType(c),
+                                PopupMenuButton<StatementOperationType>(
+                                  tooltip: 'Alterar tipo de operação',
+                                  onSelected: (op) =>
+                                      _changeCandidateOperation(c, op),
+                                  itemBuilder: (_) => StatementOperationType
+                                      .values
+                                      .map(
+                                        (op) => PopupMenuItem(
+                                          value: op,
+                                          child: Text(
+                                            op.label,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: _colorForOperation(op),
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 6,
@@ -610,10 +719,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                                           AppFormatters.currency(c.amount),
                                           style: TextStyle(
                                             fontWeight: FontWeight.w700,
-                                            color: c.type ==
-                                                    TransactionType.income
-                                                ? AppColors.emerald
-                                                : AppColors.rose,
+                                            color: opColor,
                                           ),
                                         ),
                                         Container(
@@ -622,25 +728,18 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: (c.type ==
-                                                        TransactionType.income
-                                                    ? AppColors.emerald
-                                                    : AppColors.rose)
-                                                .withValues(alpha: 0.12),
+                                            color: opColor.withValues(
+                                              alpha: 0.12,
+                                            ),
                                             borderRadius:
                                                 BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            c.type == TransactionType.income
-                                                ? 'Receita ⇄'
-                                                : 'Despesa ⇄',
+                                            '${c.operationType.label} ▾',
                                             style: TextStyle(
                                               fontSize: 10.5,
                                               fontWeight: FontWeight.w700,
-                                              color: c.type ==
-                                                      TransactionType.income
-                                                  ? AppColors.emerald
-                                                  : AppColors.rose,
+                                              color: opColor,
                                             ),
                                           ),
                                         ),
@@ -662,28 +761,97 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                                   ),
                                 ),
                               ),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 12),
-                              child: DropdownButton<String>(
-                                value: c.suggestedCategoryId,
-                                isExpanded: true,
-                                isDense: true,
-                                items: state.categories
-                                    .where((cat) => cat.type == c.type)
-                                    .map(
-                                      (cat) => DropdownMenuItem(
-                                        value: cat.id,
-                                        child: Text(
-                                          cat.name,
-                                          style: const TextStyle(fontSize: 13),
+                            if (c.operationType.isCofrinho &&
+                                state.goals.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 12,
+                                  bottom: 4,
+                                ),
+                                child: DropdownButton<String>(
+                                  value: state.goals.any(
+                                    (g) => g.id == c.suggestedGoalId,
+                                  )
+                                      ? c.suggestedGoalId
+                                      : state.goals.first.id,
+                                  isExpanded: true,
+                                  isDense: true,
+                                  items: state.goals
+                                      .map(
+                                        (g) => DropdownMenuItem(
+                                          value: g.id,
+                                          child: Text(
+                                            'Cofrinho: ${g.name}',
+                                            style: const TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.indigoPrimary,
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (v) =>
-                                    setState(() => c.suggestedCategoryId = v),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => c.suggestedGoalId = v),
+                                ),
                               ),
-                            ),
+                            if (c.operationType ==
+                                    StatementOperationType.transfer &&
+                                state.accounts.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: DropdownButton<String>(
+                                  value: state.accounts.any(
+                                    (a) => a.id == c.destinationAccountId,
+                                  )
+                                      ? c.destinationAccountId
+                                      : state.accounts.first.id,
+                                  isExpanded: true,
+                                  isDense: true,
+                                  items: state.accounts
+                                      .map(
+                                        (a) => DropdownMenuItem(
+                                          value: a.id,
+                                          child: Text(
+                                            'Conta de Destino: ${a.name}',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) => setState(
+                                    () => c.destinationAccountId = v,
+                                  ),
+                                ),
+                              )
+                            else if (c.operationType !=
+                                StatementOperationType.transfer)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: DropdownButton<String>(
+                                  value: c.suggestedCategoryId,
+                                  isExpanded: true,
+                                  isDense: true,
+                                  items: state.categories
+                                      .where((cat) => cat.type == c.type)
+                                      .map(
+                                        (cat) => DropdownMenuItem(
+                                          value: cat.id,
+                                          child: Text(
+                                            cat.name,
+                                            style:
+                                                const TextStyle(fontSize: 13),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => c.suggestedCategoryId = v),
+                                ),
+                              ),
                           ],
                         ),
                       ),

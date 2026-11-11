@@ -105,6 +105,50 @@ date,category,title,amount
     expect(nubankCandidates[0].type, TransactionType.expense);
     expect(nubankCandidates[1].title, 'Pagamento recebido');
     expect(nubankCandidates[1].type, TransactionType.income);
+
+    // Testa CSV do Mercado Pago (Data;Tipo;Descricao;Valor) com Cofrinho, Rendimentos, Resgate e Transferência
+    const mpCsv = '''
+Data;Tipo;Descricao;Valor
+05/11/2026;RECEITA;Pix Recebido Cliente;2500.00
+06/11/2026;GUARDAR_COFRINHO;Dinheiro guardado no Cofrinho;-500.00
+10/11/2026;RENDIMENTO_COFRINHO;Rendimentos do Cofrinho CDI;14.85
+12/11/2026;RESGATE_COFRINHO;Dinheiro retirado do Cofrinho;200.00
+14/11/2026;TRANSFERENCIA;Transferencia para minha conta Nubank;-300.00
+15/11/2026;DESPESA;Mercado Livre Compra;-189.90
+''';
+
+    final mpCandidates = ImportService.parseStatementContent(
+      content: mpCsv,
+      extension: 'csv',
+      categories: appState.categories,
+      existingTransactions: appState.transactions,
+      goals: appState.goals,
+      accounts: appState.accounts,
+      sourceAccountId: 'acc_principal',
+    );
+
+    expect(mpCandidates.length, 6);
+    expect(mpCandidates[0].operationType, StatementOperationType.income);
+    expect(
+      mpCandidates[1].operationType,
+      StatementOperationType.cofrinhoDeposit,
+    );
+    expect(mpCandidates[1].suggestedCategoryId, 'cat_aportes');
+    expect(mpCandidates[1].suggestedGoalId, 'goal_reserva');
+    expect(
+      mpCandidates[2].operationType,
+      StatementOperationType.cofrinhoYield,
+    );
+    expect(mpCandidates[2].suggestedCategoryId, 'cat_rendimentos');
+    expect(
+      mpCandidates[3].operationType,
+      StatementOperationType.cofrinhoWithdraw,
+    );
+    expect(mpCandidates[3].suggestedGoalId, 'goal_reserva');
+    expect(mpCandidates[4].operationType, StatementOperationType.transfer);
+    expect(mpCandidates[4].type, TransactionType.transfer);
+    expect(mpCandidates[4].destinationAccountId, 'acc_investimentos');
+    expect(mpCandidates[5].operationType, StatementOperationType.expense);
   });
 
   testWidgets('Renderiza MainShell Apple HIG com 4 abas e Modo Discreto', (tester) async {

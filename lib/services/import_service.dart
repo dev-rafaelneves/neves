@@ -9,6 +9,35 @@ class ImportService {
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   );
 
+  /// Prompt pronto para enviar ao Assistente Virtual do Mercado Pago (ou qualquer IA lendo o PDF/extrato)
+  /// para gerar um CSV padronizado com identificação automática de Cofrinho, Rendimentos, Transferências, Despesas e Receitas.
+  static const String mercadoPagoAssistantPrompt = '''
+Preciso que você gere um relatório das minhas movimentações (extrato da conta e/ou fatura) em formato CSV, separado por ponto e vírgula (;), contendo exatamente estas 4 colunas:
+
+Data;Tipo;Descricao;Valor
+
+Regras obrigatórias de formatação para cada coluna:
+1. Data: no formato DD/MM/AAAA (ex: 15/11/2026).
+2. Tipo: classifique cada movimentação usando EXATAMENTE uma das 6 tags abaixo:
+   - DESPESA (compras no cartão/débito, pagamentos de boletos, Pix enviados para terceiros/lojas, tarifas)
+   - RECEITA (salário, Pix recebidos de terceiros, vendas, reembolsos/estornos)
+   - TRANSFERENCIA (transferências entre contas de minha própria titularidade)
+   - GUARDAR_COFRINHO (dinheiro guardado/aplicado no Cofrinho / Reservas)
+   - RESGATE_COFRINHO (dinheiro retirado/resgatado do Cofrinho / Reservas de volta para a conta)
+   - RENDIMENTO_COFRINHO (rendimentos diários/mensais do Cofrinho ou saldo em conta)
+3. Descricao: nome limpo do estabelecimento, pessoa ou operação (sem ponto e vírgula no texto).
+4. Valor: número decimal com ponto para centavos e SEM "R\$" (use sinal negativo "-" para saídas/despesas/aplicações no cofrinho e positivo para entradas/receitas/resgates/rendimentos).
+
+Exemplo exato de como você deve responder (entregue apenas o bloco CSV):
+Data;Tipo;Descricao;Valor
+05/11/2026;RECEITA;Pix Recebido Cliente;2500.00
+06/11/2026;GUARDAR_COFRINHO;Dinheiro guardado no Cofrinho;-500.00
+10/11/2026;RENDIMENTO_COFRINHO;Rendimentos do Cofrinho CDI;14.85
+12/11/2026;RESGATE_COFRINHO;Dinheiro retirado do Cofrinho;200.00
+14/11/2026;TRANSFERENCIA;Transferencia para minha conta Nubank;-300.00
+15/11/2026;DESPESA;Mercado Livre Compra;-189.90
+''';
+
   static String computeImportHash({
     required DateTime date,
     required double amount,
@@ -27,6 +56,9 @@ class ImportService {
     required String extension,
     required List<CategoryModel> categories,
     required List<TransactionModel> existingTransactions,
+    List<GoalModel> goals = const [],
+    List<Account> accounts = const [],
+    String? sourceAccountId,
     bool forceExpenseForCreditCard = false,
     bool invertSigns = false,
   }) {
@@ -58,32 +90,202 @@ class ImportService {
       if (candidate.isDuplicate) {
         candidate.selected = false;
       }
-      candidate.suggestedCategoryId = suggestCategory(
-        title: candidate.title,
-        type: candidate.type,
+      applyOperationMetadata(
+        candidate: candidate,
         categories: categories,
         existingTransactions: existingTransactions,
+        goals: goals,
+        accounts: accounts,
+        sourceAccountId: sourceAccountId,
       );
     }
 
     return rawCandidates;
   }
 
-  /// Inverte Receita <-> Despesa de todos os candidatos e recalcula a sugestão de categoria
+  /// Aplica o TransactionType, Categoria, Cofrinho (Goal) e Conta de Destino de acordo com o StatementOperationType
+  static void applyOperationMetadata({
+    required ImportedTransactionCandidate candidate,
+    required List<CategoryModel> categories,
+    required List<TransactionModel> existingTransactions,
+    List<GoalModel> goals = const [],
+    List<Account> accounts = const [],
+    String? sourceAccountId,
+  }) {
+    candidate.type = candidate.operationType.transactionType;
+
+    // Cofrinho padrão (prioriza meta com "cofrinho" ou "reserva" no nome, ou a primeira disponível)
+    String? defaultGoalId;
+    if (goals.isNotEmpty) {
+      final match = goals.where((g) {
+        final lower = g.name.toLowerCase();
+        return lower.contains('cofrinho') ||
+            lower.contains('reserva') ||
+            lower.contains('caixinha');
+      });
+      defaultGoalId = match.isNotEmpty ? match.first.id : goals.first.id;
+    }
+
+    // Conta de destino padrão para transferências (outra conta diferente da conta de origem)
+    String? defaultDestAccId;
+    if (accounts.isNotEmpty) {
+      final other = accounts.where((a) => a.id != sourceAccountId);
+      defaultDestAccId = other.isNotEmpty ? other.first.id : accounts.first.id;
+    }
+
+    switch (candidate.operationType) {
+      case StatementOperationType.cofrinhoDeposit:
+        candidate.suggestedGoalId ??= defaultGoalId;
+        candidate.destinationAccountId = null;
+        candidate.suggestedCategoryId = _findCategoryId(
+          categories,
+          preferredId: 'cat_aportes',
+          type: TransactionType.expense,
+        );
+        break;
+      case StatementOperationType.cofrinhoWithdraw:
+        candidate.suggestedGoalId ??= defaultGoalId;
+        candidate.destinationAccountId = null;
+        candidate.suggestedCategoryId = _findCategoryId(
+          categories,
+          preferredId: 'cat_outras_receitas',
+          type: TransactionType.income,
+        );
+        break;
+      case StatementOperationType.cofrinhoYield:
+        candidate.suggestedGoalId ??= defaultGoalId;
+        candidate.destinationAccountId = null;
+        candidate.suggestedCategoryId = _findCategoryId(
+          categories,
+          preferredId: 'cat_rendimentos',
+          type: TransactionType.income,
+        );
+        break;
+      case StatementOperationType.transfer:
+        candidate.suggestedGoalId = null;
+        candidate.suggestedCategoryId = null;
+        candidate.destinationAccountId ??= defaultDestAccId;
+        break;
+      case StatementOperationType.expense:
+      case StatementOperationType.income:
+        candidate.suggestedGoalId = null;
+        candidate.destinationAccountId = null;
+        candidate.suggestedCategoryId = suggestCategory(
+          title: candidate.title,
+          type: candidate.type,
+          categories: categories,
+          existingTransactions: existingTransactions,
+        );
+        break;
+    }
+  }
+
+  static String? _findCategoryId(
+    List<CategoryModel> categories, {
+    required String preferredId,
+    required TransactionType type,
+  }) {
+    for (final c in categories) {
+      if (c.id == preferredId) return c.id;
+    }
+    final valid = categories.where((c) => c.type == type);
+    return valid.isNotEmpty ? valid.first.id : null;
+  }
+
+  /// Detecta automaticamente uma das 6 operações a partir da descrição do extrato (Mercado Pago, Nubank, Inter, etc.)
+  static StatementOperationType detectOperationType({
+    required String title,
+    required bool isExpenseBySign,
+  }) {
+    final lower = title.toLowerCase();
+
+    // 1. Rendimentos no Cofrinho / Conta remunerada
+    if (lower.contains('rendimento') ||
+        lower.contains('rendimentos') ||
+        lower.contains('juros cofrinho') ||
+        lower.contains('remuneração de conta') ||
+        lower.contains('remuneracao de conta')) {
+      return StatementOperationType.cofrinhoYield;
+    }
+
+    // 2. Dinheiro retirado / resgatado do Cofrinho / Caixinha / Reservas
+    if (lower.contains('dinheiro retirado') ||
+        lower.contains('retirada do cofrinho') ||
+        lower.contains('retirado do cofrinho') ||
+        lower.contains('resgate do cofrinho') ||
+        lower.contains('resgate cofrinho') ||
+        lower.contains('resgate de reserva') ||
+        lower.contains('resgate reservas') ||
+        lower.contains('resgate caixinha') ||
+        lower.contains('retirada caixinha') ||
+        lower.contains('dinheiro resgatado') ||
+        (lower.contains('liberação de dinheiro') &&
+            lower.contains('reserva'))) {
+      return StatementOperationType.cofrinhoWithdraw;
+    }
+
+    // 3. Dinheiro guardado / aplicado no Cofrinho / Caixinha / Reservas
+    if (lower.contains('dinheiro guardado') ||
+        lower.contains('guardar no cofrinho') ||
+        lower.contains('guardado no cofrinho') ||
+        lower.contains('aplicação no cofrinho') ||
+        lower.contains('aplicacao no cofrinho') ||
+        lower.contains('depósito no cofrinho') ||
+        lower.contains('deposito no cofrinho') ||
+        lower.contains('reserva no cofrinho') ||
+        lower.contains('dinheiro reservado') ||
+        lower.contains('guardado na caixinha') ||
+        lower.contains('aplicação caixinha') ||
+        lower.contains('aplicacao caixinha') ||
+        (lower.contains('cofrinho') && isExpenseBySign)) {
+      return StatementOperationType.cofrinhoDeposit;
+    }
+
+    // Caso mencione cofrinho com sinal de entrada e não caiu nas regras acima, é resgate do cofrinho
+    if (lower.contains('cofrinho') && !isExpenseBySign) {
+      return StatementOperationType.cofrinhoWithdraw;
+    }
+
+    // 4. Transferência entre contas próprias
+    if (lower.contains('transferência entre contas') ||
+        lower.contains('transferencia entre contas') ||
+        lower.contains('mesma titularidade') ||
+        lower.contains('conta própria') ||
+        lower.contains('conta propria')) {
+      return StatementOperationType.transfer;
+    }
+
+    return isExpenseBySign
+        ? StatementOperationType.expense
+        : StatementOperationType.income;
+  }
+
+  /// Inverte Receita <-> Despesa (e Guardar <-> Retirada Cofrinho) de todos os candidatos e recalcula metadados
   static void invertAllCandidateTypes({
     required List<ImportedTransactionCandidate> candidates,
     required List<CategoryModel> categories,
     required List<TransactionModel> existingTransactions,
+    List<GoalModel> goals = const [],
+    List<Account> accounts = const [],
+    String? sourceAccountId,
   }) {
     for (final c in candidates) {
-      c.type = c.type == TransactionType.expense
-          ? TransactionType.income
-          : TransactionType.expense;
-      c.suggestedCategoryId = suggestCategory(
-        title: c.title,
-        type: c.type,
+      if (c.operationType == StatementOperationType.expense) {
+        c.operationType = StatementOperationType.income;
+      } else if (c.operationType == StatementOperationType.income) {
+        c.operationType = StatementOperationType.expense;
+      } else if (c.operationType == StatementOperationType.cofrinhoDeposit) {
+        c.operationType = StatementOperationType.cofrinhoWithdraw;
+      } else if (c.operationType == StatementOperationType.cofrinhoWithdraw) {
+        c.operationType = StatementOperationType.cofrinhoDeposit;
+      }
+      applyOperationMetadata(
+        candidate: c,
         categories: categories,
         existingTransactions: existingTransactions,
+        goals: goals,
+        accounts: accounts,
+        sourceAccountId: sourceAccountId,
       );
     }
   }
@@ -163,12 +365,17 @@ class ImportService {
 
     final absAmount = parsedAmt.abs();
     final hash = computeImportHash(date: date, amount: absAmount, title: memo);
+    final opType = detectOperationType(
+      title: memo,
+      isExpenseBySign: isExpense,
+    );
 
     return ImportedTransactionCandidate(
       title: memo,
       amount: absAmount,
       date: date,
-      type: isExpense ? TransactionType.expense : TransactionType.income,
+      type: opType.transactionType,
+      operationType: opType,
       importHash: hash,
     );
   }
@@ -236,6 +443,7 @@ class ImportService {
 
       DateTime? foundDate;
       double? foundAmount;
+      StatementOperationType? explicitOpType;
       final textParts = <String>[];
 
       for (final col in cols) {
@@ -250,6 +458,13 @@ class ImportService {
           final amt = _tryParseCurrency(col);
           if (amt != null && amt != 0) {
             foundAmount = amt;
+            continue;
+          }
+        }
+        if (explicitOpType == null) {
+          final parsedOp = StatementOperationType.tryParseCsvToken(col);
+          if (parsedOp != null) {
+            explicitOpType = parsedOp;
             continue;
           }
         }
@@ -284,6 +499,12 @@ class ImportService {
           isExpense = !isExpense;
         }
 
+        final opType = explicitOpType ??
+            detectOperationType(
+              title: title,
+              isExpenseBySign: isExpense,
+            );
+
         final absAmount = foundAmount.abs();
         final hash = computeImportHash(
           date: foundDate,
@@ -296,7 +517,8 @@ class ImportService {
             title: title,
             amount: absAmount,
             date: foundDate,
-            type: isExpense ? TransactionType.expense : TransactionType.income,
+            type: opType.transactionType,
+            operationType: opType,
             importHash: hash,
           ),
         );
