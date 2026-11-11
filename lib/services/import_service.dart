@@ -585,7 +585,10 @@ Data;Tipo;Descricao;Valor
     final validCats = categories.where((c) => c.type == type).toList();
     if (validCats.isEmpty) return null;
 
-    String? findByKeyword(String nameFragment) {
+    String? findByIdOrKeyword(String preferredId, String nameFragment) {
+      for (final c in validCats) {
+        if (c.id == preferredId) return c.id;
+      }
       for (final c in validCats) {
         if (c.name.toLowerCase().contains(nameFragment)) return c.id;
       }
@@ -595,151 +598,361 @@ Data;Tipo;Descricao;Valor
     if (type == TransactionType.income) {
       if (lower.contains('salário') ||
           lower.contains('salario') ||
-          lower.contains('pagamento') ||
-          lower.contains('adiantamento')) {
-        return findByKeyword('salário') ?? validCats.first.id;
+          lower.contains('folha') ||
+          lower.contains('pro-labore') ||
+          lower.contains('pró-labore') ||
+          lower.contains('adiantamento salarial')) {
+        return findByIdOrKeyword('cat_salario', 'salário') ??
+            validCats.first.id;
       }
       if (lower.contains('dividendo') ||
           lower.contains('rendimento') ||
+          lower.contains('juros') ||
+          lower.contains('jcp') ||
           lower.contains('fii') ||
-          lower.contains('cdb')) {
-        return findByKeyword('rendimento') ?? validCats.first.id;
+          lower.contains('cdb') ||
+          lower.contains('remuneração') ||
+          lower.contains('remuneracao')) {
+        return findByIdOrKeyword('cat_rendimentos', 'rendimento') ??
+            validCats.first.id;
       }
-      return validCats.first.id;
+      return findByIdOrKeyword('cat_outras_receitas', 'renda extra') ??
+          validCats.last.id;
     }
 
-    // Heurística de despesas brasileiras + categorias do CSV Nubank
+    // 1. Aportes, Cofrinho e Investimentos
+    if (lower.contains('cofrinho') ||
+        lower.contains('caixinha') ||
+        lower.contains('reserva') ||
+        lower.contains('aporte') ||
+        lower.contains('investimento') ||
+        lower.contains('tesouro') ||
+        lower.contains('cdb') ||
+        lower.contains('rdb') ||
+        lower.contains('poupança') ||
+        lower.contains('poupanca')) {
+      return findByIdOrKeyword('cat_aportes', 'aportes');
+    }
+
+    // 2. E-commerce, Lojas e Compras (antes de "mercado" para que "Mercado Livre" / "Mercado Pago" não caia em Supermercado)
+    if (lower.contains('mercado livre') ||
+        lower.contains('mercadolivre') ||
+        lower.contains('meli') ||
+        lower.contains('shopee') ||
+        lower.contains('shpp') ||
+        lower.contains('amazon') ||
+        lower.contains('shein') ||
+        lower.contains('aliexpress') ||
+        lower.contains('magalu') ||
+        lower.contains('magazine') ||
+        lower.contains('casas bahia') ||
+        lower.contains('americanas') ||
+        lower.contains('renner') ||
+        lower.contains('riachuelo') ||
+        lower.contains('cea') ||
+        lower.contains('c&a') ||
+        lower.contains('zara') ||
+        lower.contains('centauro') ||
+        lower.contains('nike') ||
+        lower.contains('adidas') ||
+        lower.contains('decathlon') ||
+        lower.contains('kabum') ||
+        lower.contains('pichau') ||
+        lower.contains('kalunga') ||
+        lower.contains('leroy') ||
+        lower.contains('boticario') ||
+        lower.contains('boticário') ||
+        lower.contains('natura') ||
+        lower.contains('sephora') ||
+        lower.contains('petz') ||
+        lower.contains('cobasi') ||
+        lower.contains('petshop') ||
+        lower.contains('loja ')) {
+      return findByIdOrKeyword('cat_compras', 'compras');
+    }
+
+    // 3. Transporte, Apps de Mobilidade e Combustível
     if (lower.contains('uber') ||
-        lower.contains('99') ||
+        lower.contains('99app') ||
+        lower.contains('99*') ||
+        lower.contains('99 pop') ||
+        lower.contains('99taxi') ||
+        lower.contains('indriver') ||
+        lower.contains('taxi') ||
+        lower.contains('táxi') ||
         lower.contains('posto') ||
         lower.contains('combust') ||
+        lower.contains('gasolina') ||
+        lower.contains('etanol') ||
         lower.contains('shell') ||
         lower.contains('ipiranga') ||
         lower.contains('petrobras') ||
+        lower.contains('auto posto') ||
         lower.contains('estacionamento') ||
+        lower.contains('estapar') ||
+        lower.contains('indigo') ||
         lower.contains('sem parar') ||
+        lower.contains('semparar') ||
         lower.contains('veloe') ||
-        lower.contains('pedagio')) {
-      return findByKeyword('transporte');
+        lower.contains('conectcar') ||
+        lower.contains('pedagio') ||
+        lower.contains('pedágio') ||
+        lower.contains('metro') ||
+        lower.contains('metrô') ||
+        lower.contains('onibus') ||
+        lower.contains('ônibus') ||
+        lower.contains('bilhete unico') ||
+        lower.contains('oficina') ||
+        lower.contains('pneu') ||
+        lower.contains('localiza') ||
+        lower.contains('movida') ||
+        lower.contains('unidas')) {
+      return findByIdOrKeyword('cat_transporte', 'transporte');
     }
+
+    // 4. Restaurantes, Delivery, Padarias e Lanches
     if (lower.contains('ifood') ||
+        lower.contains('ifd*') ||
+        lower.contains('rappi') ||
+        lower.contains('ze delivery') ||
+        lower.contains('zé delivery') ||
+        lower.contains('aiqfome') ||
         lower.contains('restaurante') ||
         lower.contains('padaria') ||
+        lower.contains('panificadora') ||
+        lower.contains('confeitaria') ||
         lower.contains('lanch') ||
         lower.contains('burger') ||
+        lower.contains('hamburgueria') ||
         lower.contains('mcdonald') ||
+        lower.contains('mc donald') ||
         lower.contains('bk ') ||
+        lower.contains('burger king') ||
         lower.contains('outback') ||
+        lower.contains('madero') ||
+        lower.contains('jeronimo') ||
+        lower.contains('subway') ||
+        lower.contains('habib') ||
+        lower.contains('bobs') ||
+        lower.contains('spoleto') ||
+        lower.contains('coco bambu') ||
         lower.contains('pizza') ||
         lower.contains('sushi') ||
+        lower.contains('temaki') ||
         lower.contains('acai') ||
         lower.contains('açaí') ||
+        lower.contains('sorvete') ||
+        lower.contains('gelato') ||
         lower.contains('cafe') ||
-        lower.contains('café')) {
-      return findByKeyword('restaurante') ?? findByKeyword('alimenta');
+        lower.contains('café') ||
+        lower.contains('starbucks') ||
+        lower.contains('cacau show') ||
+        lower.contains('kopenhagen') ||
+        lower.contains('churrascaria') ||
+        lower.contains('espetinho') ||
+        lower.contains('bar ') ||
+        lower.contains('choperia') ||
+        lower.contains('doceria')) {
+      return findByIdOrKeyword('cat_restaurante', 'restaurante');
     }
-    if (lower.contains('mercado') ||
+
+    // 5. Supermercado, Atacadistas, Mercearias e Conveniência
+    final isMercadoPagoOrLivre = lower.contains('mercado pago') ||
+        lower.contains('mercadopago') ||
+        lower.contains('mercado livre') ||
+        lower.contains('mercadolivre');
+    if ((!isMercadoPagoOrLivre && lower.contains('mercado')) ||
         lower.contains('supermercado') ||
         lower.contains('atacad') ||
         lower.contains('carrefour') ||
         lower.contains('assai') ||
         lower.contains('assaí') ||
         lower.contains('pao de acucar') ||
+        lower.contains('pão de açúcar') ||
         lower.contains('hortifruti') ||
-        lower.contains(' sacolao') ||
-        lower.contains('acougue')) {
-      return findByKeyword('mercado') ?? findByKeyword('alimenta');
+        lower.contains('sacolao') ||
+        lower.contains('sacolão') ||
+        lower.contains('acougue') ||
+        lower.contains('açougue') ||
+        lower.contains('mercearia') ||
+        lower.contains('oxxo') ||
+        lower.contains('muffato') ||
+        lower.contains('condor') ||
+        lower.contains('angeloni') ||
+        lower.contains('zaffari') ||
+        lower.contains('guanabara') ||
+        lower.contains('mundial') ||
+        lower.contains('sonda') ||
+        lower.contains('savegnago') ||
+        lower.contains('covabra') ||
+        lower.contains('tenda') ||
+        lower.contains('swift') ||
+        lower.contains('emporio') ||
+        lower.contains('empório')) {
+      return findByIdOrKeyword('cat_mercado', 'mercado');
     }
+
+    // 6. Assinaturas, Streaming e Serviços Digitais
     if (lower.contains('netflix') ||
         lower.contains('spotify') ||
-        lower.contains('prime') ||
+        lower.contains('amazon prime') ||
+        lower.contains('prime video') ||
         lower.contains('icloud') ||
         lower.contains('apple.com/bill') ||
-        lower.contains('google') ||
+        lower.contains('google one') ||
+        lower.contains('google play') ||
         lower.contains('youtube') ||
         lower.contains('chatgpt') ||
         lower.contains('openai') ||
         lower.contains('claude') ||
+        lower.contains('anthropic') ||
         lower.contains('disney') ||
         lower.contains('hbo') ||
-        lower.contains('max')) {
-      return findByKeyword('assinatura');
+        lower.contains('max') ||
+        lower.contains('globoplay') ||
+        lower.contains('paramount') ||
+        lower.contains('crunchyroll') ||
+        lower.contains('deezer') ||
+        lower.contains('canva') ||
+        lower.contains('adobe') ||
+        lower.contains('microsoft') ||
+        lower.contains('meli+') ||
+        lower.contains('assinatura')) {
+      return findByIdOrKeyword('cat_assinaturas', 'assinatura');
     }
+
+    // 7. Saúde, Farmácia, Academia e Cuidados Pessoais
     if (lower.contains('farmacia') ||
         lower.contains('farmácia') ||
         lower.contains('droga') ||
+        lower.contains('drogaria') ||
+        lower.contains('drogasil') ||
         lower.contains('raia') ||
         lower.contains('pacheco') ||
         lower.contains('pague menos') ||
         lower.contains('panvel') ||
+        lower.contains('araujo') ||
+        lower.contains('araújo') ||
+        lower.contains('nissei') ||
+        lower.contains('extrafarma') ||
         lower.contains('hospital') ||
         lower.contains('unimed') ||
+        lower.contains('amil') ||
+        lower.contains('sulamerica') ||
+        lower.contains('hapvida') ||
         lower.contains('medico') ||
         lower.contains('médico') ||
+        lower.contains('consulta') ||
         lower.contains('clinica') ||
         lower.contains('clínica') ||
         lower.contains('laboratorio') ||
+        lower.contains('laboratório') ||
+        lower.contains('exame') ||
+        lower.contains('fleury') ||
+        lower.contains('dasa') ||
+        lower.contains('dentista') ||
+        lower.contains('odonto') ||
+        lower.contains('psicolog') ||
+        lower.contains('terapia') ||
         lower.contains('smartfit') ||
+        lower.contains('smart fit') ||
+        lower.contains('bluefit') ||
+        lower.contains('bodytech') ||
+        lower.contains('academia') ||
         lower.contains('gympass') ||
-        lower.contains('wellhub')) {
-      return findByKeyword('saúde') ?? findByKeyword('saude');
+        lower.contains('wellhub') ||
+        lower.contains('totalpass') ||
+        lower.contains('suplemento') ||
+        lower.contains('barbearia') ||
+        lower.contains('salao') ||
+        lower.contains('salão')) {
+      return findByIdOrKeyword('cat_saude', 'saúde');
     }
+
+    // 8. Educação, Cursos e Livros
     if (lower.contains('escola') ||
+        lower.contains('colégio') ||
+        lower.contains('colegio') ||
         lower.contains('faculdade') ||
+        lower.contains('universidade') ||
         lower.contains('curso') ||
         lower.contains('udemy') ||
         lower.contains('alura') ||
-        lower.contains('livraria')) {
-      return findByKeyword('educação') ?? findByKeyword('educacao');
+        lower.contains('rocketseat') ||
+        lower.contains('hotmart') ||
+        lower.contains('kiwify') ||
+        lower.contains('eduzz') ||
+        lower.contains('livraria') ||
+        lower.contains('saraiva') ||
+        lower.contains('papelaria')) {
+      return findByIdOrKeyword('cat_educacao', 'educação');
     }
-    if (lower.contains('mercado livre') ||
-        lower.contains('mercadolivre') ||
-        lower.contains('meli') ||
-        lower.contains('shopee') ||
-        lower.contains('amazon') ||
-        lower.contains('shein') ||
-        lower.contains('magalu') ||
-        lower.contains('magazine') ||
-        lower.contains('renner') ||
-        lower.contains('riachuelo') ||
-        lower.contains('cea') ||
-        lower.contains('zara') ||
-        lower.contains('centauro') ||
-        lower.contains('nike')) {
-      return findByKeyword('compras') ?? findByKeyword('vestuário');
-    }
+
+    // 9. Lazer, Cinema, Jogos e Viagens
     if (lower.contains('cinema') ||
+        lower.contains('cinemark') ||
         lower.contains('ingresso') ||
+        lower.contains('sympla') ||
+        lower.contains('eventim') ||
+        lower.contains('show') ||
+        lower.contains('teatro') ||
         lower.contains('steam') ||
         lower.contains('playstation') ||
         lower.contains('xbox') ||
         lower.contains('nintendo') ||
+        lower.contains('riot') ||
         lower.contains('hotel') ||
+        lower.contains('pousada') ||
         lower.contains('airbnb') ||
         lower.contains('booking') ||
+        lower.contains('decolar') ||
         lower.contains('latam') ||
         lower.contains('azul') ||
-        lower.contains('gol ')) {
-      return findByKeyword('lazer') ?? findByKeyword('viagens');
+        lower.contains('gol ') ||
+        lower.contains('passagem') ||
+        lower.contains('viagem')) {
+      return findByIdOrKeyword('cat_lazer', 'lazer');
     }
+
+    // 10. Moradia, Contas Residenciais, Telefonia e Impostos
     if (lower.contains('aluguel') ||
+        lower.contains('quintoandar') ||
+        lower.contains('quinto andar') ||
         lower.contains('condominio') ||
         lower.contains('condomínio') ||
         lower.contains('energia') ||
+        lower.contains('eletricidade') ||
         lower.contains('enel') ||
         lower.contains('cpfl') ||
         lower.contains('light') ||
+        lower.contains('cemig') ||
+        lower.contains('copel') ||
+        lower.contains('celesc') ||
+        lower.contains('equatorial') ||
+        lower.contains('neoenergia') ||
         lower.contains('sabesp') ||
         lower.contains('saneago') ||
         lower.contains('copasa') ||
+        lower.contains('sanepar') ||
+        lower.contains('embasa') ||
+        lower.contains('cedae') ||
         lower.contains('comgas') ||
+        lower.contains('ultragaz') ||
         lower.contains('vivo') ||
         lower.contains('claro') ||
         lower.contains('tim') ||
-        lower.contains('internet')) {
-      return findByKeyword('moradia');
+        lower.contains('internet') ||
+        lower.contains('iptu') ||
+        lower.contains('ipva') ||
+        lower.contains('darf') ||
+        lower.contains('imposto') ||
+        lower.contains('tarifa') ||
+        lower.contains('iof') ||
+        lower.contains('seguro')) {
+      return findByIdOrKeyword('cat_moradia', 'moradia');
     }
 
-    return validCats.first.id;
+    // Fallback padrão para compras/pagamentos diversos: Compras & Vestuário (em vez de Moradia)
+    return findByIdOrKeyword('cat_compras', 'compras') ?? validCats.first.id;
   }
 }

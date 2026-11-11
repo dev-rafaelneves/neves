@@ -199,7 +199,11 @@ class GeminiService {
   }) async {
     if (!forceRefresh) {
       final cached = await DatabaseService.getAiInsight(yearMonth);
-      if (cached != null && cached.isNotEmpty) {
+      // Ignora cache antigo caso tenha sido salvo cortado (< 220 chars) ou com fragmentos em inglês
+      if (cached != null &&
+          cached.trim().length >= 220 &&
+          !cached.contains('The Paradox') &&
+          !cached.contains('Step 3:')) {
         return cached;
       }
     }
@@ -230,7 +234,7 @@ class GeminiService {
 
     final prompt = '''
 Você é o Consultor Financeiro Pessoal do aplicativo Neves.
-Analise os dados financeiros reais do mês ($yearMonth) abaixo e forneça um diagnóstico executivo, direto, empático e acionável em português brasileiro.
+Analise os dados financeiros reais do mês ($yearMonth) abaixo e forneça um diagnóstico executivo completo, direto, empático e acionável, escrito 100% em português brasileiro (nunca responda em inglês).
 
 RESUMO DO MÊS ($yearMonth):
 - Receitas Totais: R\$ ${totalIncome.toStringAsFixed(2)}
@@ -252,10 +256,15 @@ DIRETRIZES DA RESPOSTA:
 1. **Diagnóstico de Fluxo de Caixa e Regra 50/30/20**: Avalie o equilíbrio entre receitas e despesas e aponte se algum pilar da regra 50/30/20 está desajustado.
 2. **Maiores Vilões e Cartão de Crédito**: Identifique as categorias que mais pesaram no orçamento e comente sobre o nível de parcelas futuras no cartão.
 3. **Plano de Ação Prático (3 Passos)**: Sugira 3 ações concretas e realistas para otimizar a taxa de poupança e acelerar as metas financeiras no próximo mês.
-4. Formate em Markdown limpo com subtítulos curtos, bullet points e no máximo 320 palavras.
+4. Formate em Markdown limpo com subtítulos curtos, bullet points e entre 220 e 350 palavras. Entregue o texto completo até a conclusão.
 ''';
 
-    final text = await _callGeminiApi(key: key, prompt: prompt);
+    final text = await _callGeminiApi(
+      key: key,
+      prompt: prompt,
+      maxOutputTokens: 4096,
+      temperature: 0.35,
+    );
 
     await DatabaseService.saveAiInsight(
       yearMonth: yearMonth,
@@ -293,6 +302,7 @@ DIRETRIZES DA RESPOSTA:
     final itemsPayload = <Map<String, dynamic>>[];
     for (int i = 0; i < candidates.length; i++) {
       final c = candidates[i];
+      if (c.operationType == StatementOperationType.transfer) continue;
       itemsPayload.add({
         'i': i,
         'title': c.title,
@@ -301,29 +311,46 @@ DIRETRIZES DA RESPOSTA:
       });
     }
 
-    final prompt = '''
-Você é um classificador inteligente de extratos bancários e faturas de cartão no Brasil (Nubank, Itaú, Inter, Bradesco, C6, etc.).
-Associe cada lançamento abaixo ao `id` da categoria mais adequada, respeitando o tipo (`expense` usa apenas CATEGORIAS DE DESPESA; `income` usa apenas CATEGORIAS DE RECEITA).
+    if (itemsPayload.isEmpty) return {};
 
-CATEGORIAS DE DESPESA (expense):
+    final prompt = '''
+Você é um especialista em categorização de extratos bancários e faturas de cartão no Brasil (Mercado Pago, Nubank, Itaú, Inter, Bradesco, C6).
+Classifique cada lançamento em seu `id` de categoria exato, respeitando obrigatoriamente o campo `type` (`expense` -> apenas categorias de despesa; `income` -> apenas categorias de receita).
+
+GUIA DE CATEGORIAS DO BRASIL:
+- `cat_mercado` (Supermercado): APENAS supermercados, atacadistas, mercearias, hortifruti, açougues, conveniências (Assaí, Atacadão, Carrefour, Pão de Açúcar, Oxxo, Extra). ATENÇÃO: "Mercado Livre" e "Mercado Pago" NÃO são supermercado!
+- `cat_compras` (Compras & Vestuário): Compras online e físicas, Mercado Livre, Shopee, Amazon, Shein, AliExpress, Magalu, Casas Bahia, Americanas, roupas (Renner, Riachuelo, C&A, Zara, Nike), eletrônicos, presentes, petshop, cosméticos e pagamentos/Pix para comércios ou prestadores diversos.
+- `cat_restaurante` (Restaurantes & Delivery): iFood, Rappi, Zé Delivery, restaurantes, padarias, lanchonetes, hamburguerias, pizzarias, açaí, sorveterias, cafeterias, bares (McDonald's, BK, Outback, Cacau Show).
+- `cat_transporte` (Transporte & Combustível): Uber, 99, táxi, postos de combustível (Shell, Ipiranga, Petrobras), estacionamento, pedágio (Sem Parar, Veloe, ConectCar), ônibus, metrô, manutenção/oficina.
+- `cat_assinaturas` (Assinaturas & Apps): Streaming, serviços digitais, softwares e clubes (Netflix, Spotify, Prime, Disney+, HBO Max, YouTube, Apple/iCloud, Google Play/One, ChatGPT, Meli+).
+- `cat_saude` (Saúde & Farmácia): Farmácias e drogarias (Drogasil, Raia, Pacheco, Pague Menos, Panvel), consultas médicas, exames, hospitais, planos de saúde (Unimed), dentista, academia (SmartFit, Wellhub/Gympass), barbearia/salão.
+- `cat_educacao` (Educação & Cursos): Escola, faculdade, cursos online (Udemy, Alura, Hotmart, Kiwify), livros, livrarias, papelaria, idiomas.
+- `cat_lazer` (Lazer & Viagens): Cinema, shows, ingressos (Sympla, Eventim), jogos (Steam, PlayStation, Xbox, Nintendo), hotéis, Airbnb, passagens aéreas (Latam, Gol, Azul), passeios.
+- `cat_moradia` (Moradia & Contas): Aluguel, condomínio, luz/energia (Enel, CPFL, Light, Cemig), água (Sabesp, Copasa, Saneago), gás, internet/celular (Vivo, Claro, Tim), impostos (IPTU, IPVA, DARF), taxas/seguros.
+- `cat_aportes` (Aportes & Futuro): Dinheiro guardado no Cofrinho/Caixinha/Reservas, aplicações em CDB, RDB, Tesouro Direto, FIIs, ações.
+- `cat_salario` (Salário & Pró-Labore): Salário, folha de pagamento, pró-labore, adiantamento salarial (apenas para `income`).
+- `cat_rendimentos` (Dividendos & Rendimentos): Rendimentos do Cofrinho/CDI, juros, dividendos, FIIs (apenas para `income`).
+- `cat_outras_receitas` (Renda Extra & Reembolsos): Pix recebidos de terceiros/clientes, transferências recebidas, vendas, estornos, reembolsos, resgate de cofrinho (apenas para `income`).
+
+CATEGORIAS DE DESPESA DISPONÍVEIS (`expense`):
 ${jsonEncode(expenseCats)}
 
-CATEGORIAS DE RECEITA (income):
+CATEGORIAS DE RECEITA DISPONÍVEIS (`income`):
 ${jsonEncode(incomeCats)}
 
 LANÇAMENTOS PARA CLASSIFICAR:
 ${jsonEncode(itemsPayload)}
 
-Responda APENAS com um objeto JSON válido (sem blocos markdown ```json e sem texto extra) mapeando o índice "i" (como string) para o "id" exato da categoria escolhida.
-Exemplo de formato esperado:
-{"0": "cat_mercado", "1": "cat_transporte"}
+Responda APENAS com um objeto JSON válido mapeando o índice "i" (como string) para o "id" exato da categoria escolhida.
+Exemplo: {"0": "cat_compras", "1": "cat_restaurante"}
 ''';
 
     final rawResponse = await _callGeminiApi(
       key: key,
       prompt: prompt,
-      maxOutputTokens: 1200,
-      temperature: 0.1,
+      maxOutputTokens: 8192,
+      temperature: 0.0,
+      responseMimeType: 'application/json',
     );
 
     String cleaned = rawResponse.trim();
@@ -364,13 +391,22 @@ Exemplo de formato esperado:
   static Future<String> _callGeminiApi({
     required String key,
     required String prompt,
-    int maxOutputTokens = 750,
+    int maxOutputTokens = 4096,
     double temperature = 0.35,
+    String? responseMimeType,
   }) async {
     final modelsToTry = [
       _activeModel,
       ...candidateModels.where((m) => m != _activeModel),
     ];
+
+    final generationConfig = <String, dynamic>{
+      'maxOutputTokens': maxOutputTokens,
+      'temperature': temperature,
+    };
+    if (responseMimeType != null) {
+      generationConfig['responseMimeType'] = responseMimeType;
+    }
 
     final payload = {
       'contents': [
@@ -380,10 +416,7 @@ Exemplo de formato esperado:
           ],
         },
       ],
-      'generationConfig': {
-        'maxOutputTokens': maxOutputTokens,
-        'temperature': temperature,
-      },
+      'generationConfig': generationConfig,
     };
 
     final bodyJson = jsonEncode(payload);
@@ -401,7 +434,7 @@ Exemplo de formato esperado:
               headers: {'Content-Type': 'application/json; charset=utf-8'},
               body: bodyJson,
             )
-            .timeout(const Duration(seconds: 25));
+            .timeout(const Duration(seconds: 30));
 
         if (response.statusCode == 200) {
           _activeModel = model;
@@ -415,8 +448,31 @@ Exemplo de formato esperado:
           if (parts == null || parts.isEmpty) {
             throw StateError('Conteúdo vazio do Gemini.');
           }
-          final text = parts.first['text'] as String?;
-          return text?.trim() ?? 'Sem resposta.';
+
+          // Filtra partes internas de raciocínio ("thought": true) dos modelos Gemini 2.5 / 3.x
+          // e concatena todas as partes reais da resposta final.
+          final nonThoughtTexts = <String>[];
+          final allTexts = <String>[];
+          for (final part in parts) {
+            if (part is Map) {
+              final txt = part['text']?.toString();
+              if (txt != null && txt.trim().isNotEmpty) {
+                allTexts.add(txt.trim());
+                if (part['thought'] != true) {
+                  nonThoughtTexts.add(txt.trim());
+                }
+              }
+            }
+          }
+
+          final finalText = nonThoughtTexts.isNotEmpty
+              ? nonThoughtTexts.join('\n\n').trim()
+              : (allTexts.isNotEmpty ? allTexts.last : '');
+
+          if (finalText.isEmpty) {
+            throw StateError('Resposta vazia retornada pelo Gemini.');
+          }
+          return finalText;
         }
 
         String msg = 'Código ${response.statusCode}';
