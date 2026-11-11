@@ -35,6 +35,7 @@ class _DashboardTabState extends State<DashboardTab> {
     AccountType selectedType = existing?.type ?? AccountType.checking;
     final int selectedColor = existing?.colorValue ?? 0xFF059669;
     bool includeNetWorth = existing?.includeInNetWorth ?? true;
+    String? errorMsg;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -44,7 +45,54 @@ class _DashboardTabState extends State<DashboardTab> {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
         return StatefulBuilder(
-          builder: (context, setModalState) {
+          builder: (modalContext, setModalState) {
+            Future<void> handleSaveAccount() async {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) {
+                HapticFeedback.heavyImpact();
+                setModalState(() {
+                  errorMsg = 'Informe o nome da conta (ou escolha uma sugestão abaixo).';
+                });
+                return;
+              }
+              final bal = CentavosCurrencyFormatter.parseValue(
+                balanceCtrl.text,
+              );
+
+              if (existing != null) {
+                final delta = bal - existing.currentBalance;
+                await widget.appState.saveAccount(
+                  existing.copyWith(
+                    name: name,
+                    type: selectedType,
+                    initialBalance: existing.initialBalance + delta,
+                    currentBalance: bal,
+                    colorValue: selectedColor,
+                    includeInNetWorth: includeNetWorth,
+                  ),
+                );
+              } else {
+                await widget.appState.saveAccount(
+                  Account(
+                    id: _uuid.v4(),
+                    name: name,
+                    type: selectedType,
+                    initialBalance: bal,
+                    currentBalance: bal,
+                    colorValue: selectedType == AccountType.investment
+                        ? 0xFF10B981
+                        : selectedColor,
+                    iconName: selectedType == AccountType.investment
+                        ? 'trending_up'
+                        : 'account_balance',
+                    includeInNetWorth: includeNetWorth,
+                  ),
+                );
+              }
+              if (mounted) setState(() {});
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            }
+
             return Container(
               padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset + 24),
               decoration: BoxDecoration(
@@ -85,28 +133,78 @@ class _DashboardTabState extends State<DashboardTab> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (existing != null)
-                          IconButton(
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              IosActionSheet.show(
-                                context: this.context,
-                                title: 'Excluir ${existing.name}',
-                                description:
-                                    'Deseja remover esta conta da sua carteira?',
-                                onConfirm: () =>
-                                    widget.appState.deleteAccount(existing.id),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: AppColors.rose,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (existing != null)
+                              IconButton(
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  IosActionSheet.show(
+                                    context: context,
+                                    title: 'Excluir ${existing.name}',
+                                    description:
+                                        'Deseja remover esta conta da sua carteira?',
+                                    onConfirm: () => widget.appState
+                                        .deleteAccount(existing.id),
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: AppColors.rose,
+                                ),
+                              ),
+                            TextButton(
+                              onPressed: handleSaveAccount,
+                              child: const Text(
+                                'Salvar',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.indigoPrimary,
+                                ),
+                              ),
                             ),
-                          )
-                        else
-                          const SizedBox(width: 48),
+                          ],
+                        ),
                       ],
                     ),
+                    if (errorMsg != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.rose.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.rose.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline_rounded,
+                              color: AppColors.rose,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMsg!,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.rose,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     HigCurrencyHeroField(
                       controller: balanceCtrl,
@@ -116,46 +214,81 @@ class _DashboardTabState extends State<DashboardTab> {
                       accentColor: selectedType == AccountType.investment
                           ? AppColors.emerald
                           : AppColors.indigoPrimary,
-                      autofocus: existing == null,
                     ),
                     const SizedBox(height: 20),
                     const HigSectionHeader(title: 'Dados da Conta'),
                     HigGroupedCard(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 6,
-                          ),
-                          child: Row(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: AppColors.indigoPrimary
-                                      .withValues(alpha: 0.13),
-                                  borderRadius: BorderRadius.circular(9),
-                                ),
-                                child: const Icon(
-                                  Icons.account_balance_rounded,
-                                  color: AppColors.indigoPrimary,
-                                  size: 19,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextField(
-                                  controller: nameCtrl,
-                                  textCapitalization:
-                                      TextCapitalization.words,
-                                  decoration: const InputDecoration(
-                                    hintText:
-                                        'Nome (ex: Itaú, Nubank, XP Invest...)',
-                                    border: InputBorder.none,
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.indigoPrimary
+                                          .withValues(alpha: 0.13),
+                                      borderRadius: BorderRadius.circular(9),
+                                    ),
+                                    child: const Icon(
+                                      Icons.account_balance_rounded,
+                                      color: AppColors.indigoPrimary,
+                                      size: 19,
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: nameCtrl,
+                                      autofocus: existing == null,
+                                      textCapitalization:
+                                          TextCapitalization.words,
+                                      onChanged: (_) {
+                                        if (errorMsg != null) {
+                                          setModalState(() => errorMsg = null);
+                                        }
+                                      },
+                                      decoration: const InputDecoration(
+                                        hintText:
+                                            'Nome da Conta (ex: Nubank, Itaú...)',
+                                        border: InputBorder.none,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  'Nubank',
+                                  'Itaú',
+                                  'Inter',
+                                  'Bradesco',
+                                  'XP Investimentos',
+                                  'Carteira',
+                                ].map((suggestion) {
+                                  return ActionChip(
+                                    label: Text(
+                                      suggestion,
+                                      style: const TextStyle(fontSize: 11.5),
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () {
+                                      setModalState(() {
+                                        nameCtrl.text = suggestion;
+                                        errorMsg = null;
+                                      });
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 6),
                             ],
                           ),
                         ),
@@ -210,48 +343,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () async {
-                          final name = nameCtrl.text.trim();
-                          if (name.isEmpty) return;
-                          final bal = CentavosCurrencyFormatter.parseValue(
-                            balanceCtrl.text,
-                          );
-
-                          if (existing != null) {
-                            final delta = bal - existing.currentBalance;
-                            await widget.appState.saveAccount(
-                              existing.copyWith(
-                                name: name,
-                                type: selectedType,
-                                initialBalance:
-                                    existing.initialBalance + delta,
-                                currentBalance: bal,
-                                colorValue: selectedColor,
-                                includeInNetWorth: includeNetWorth,
-                              ),
-                            );
-                          } else {
-                            await widget.appState.saveAccount(
-                              Account(
-                                id: _uuid.v4(),
-                                name: name,
-                                type: selectedType,
-                                initialBalance: bal,
-                                currentBalance: bal,
-                                colorValue:
-                                    selectedType == AccountType.investment
-                                        ? 0xFF10B981
-                                        : selectedColor,
-                                iconName:
-                                    selectedType == AccountType.investment
-                                        ? 'trending_up'
-                                        : 'account_balance',
-                                includeInNetWorth: includeNetWorth,
-                              ),
-                            );
-                          }
-                          if (ctx.mounted) Navigator.of(ctx).pop();
-                        },
+                        onPressed: handleSaveAccount,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.indigoPrimary,
                           foregroundColor: Colors.white,
@@ -291,6 +383,7 @@ class _DashboardTabState extends State<DashboardTab> {
     int closingDay = existing?.closingDay ?? 5;
     int dueDay = existing?.dueDay ?? 12;
     int colorVal = existing?.colorValue ?? 0xFF059669;
+    String? errorMsg;
 
     final colors = [
       0xFF059669,
@@ -309,7 +402,34 @@ class _DashboardTabState extends State<DashboardTab> {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
         return StatefulBuilder(
-          builder: (context, setModalState) {
+          builder: (modalContext, setModalState) {
+            Future<void> handleSaveCard() async {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) {
+                HapticFeedback.heavyImpact();
+                setModalState(() {
+                  errorMsg =
+                      'Informe o nome do cartão (ou toque em uma opção rápida abaixo, ex: Nubank).';
+                });
+                return;
+              }
+              final limit = CentavosCurrencyFormatter.parseValue(
+                limitCtrl.text,
+              );
+              await widget.appState.saveCreditCard(
+                CreditCardModel(
+                  id: existing?.id ?? _uuid.v4(),
+                  name: name,
+                  creditLimit: limit > 0 ? limit : 5000.0,
+                  closingDay: closingDay,
+                  dueDay: dueDay,
+                  colorValue: colorVal,
+                ),
+              );
+              if (mounted) setState(() {});
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            }
+
             return Container(
               padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset + 24),
               decoration: BoxDecoration(
@@ -352,28 +472,78 @@ class _DashboardTabState extends State<DashboardTab> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (existing != null)
-                          IconButton(
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              IosActionSheet.show(
-                                context: this.context,
-                                title: 'Excluir ${existing.name}',
-                                description:
-                                    'Deseja remover este cartão de crédito?',
-                                onConfirm: () => widget.appState
-                                    .deleteCreditCard(existing.id),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: AppColors.rose,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (existing != null)
+                              IconButton(
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  IosActionSheet.show(
+                                    context: context,
+                                    title: 'Excluir ${existing.name}',
+                                    description:
+                                        'Deseja remover este cartão de crédito?',
+                                    onConfirm: () => widget.appState
+                                        .deleteCreditCard(existing.id),
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: AppColors.rose,
+                                ),
+                              ),
+                            TextButton(
+                              onPressed: handleSaveCard,
+                              child: const Text(
+                                'Salvar',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.indigoPrimary,
+                                ),
+                              ),
                             ),
-                          )
-                        else
-                          const SizedBox(width: 48),
+                          ],
+                        ),
                       ],
                     ),
+                    if (errorMsg != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.rose.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.rose.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline_rounded,
+                              color: AppColors.rose,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMsg!,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.rose,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     HigCurrencyHeroField(
                       controller: limitCtrl,
@@ -385,38 +555,75 @@ class _DashboardTabState extends State<DashboardTab> {
                     HigGroupedCard(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 6,
-                          ),
-                          child: Row(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: Color(colorVal).withValues(alpha: 0.14),
-                                  borderRadius: BorderRadius.circular(9),
-                                ),
-                                child: Icon(
-                                  Icons.credit_card_rounded,
-                                  color: Color(colorVal),
-                                  size: 19,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextField(
-                                  controller: nameCtrl,
-                                  textCapitalization:
-                                      TextCapitalization.words,
-                                  decoration: const InputDecoration(
-                                    hintText:
-                                        'Nome do Cartão (ex: Nubank, Itaú...)',
-                                    border: InputBorder.none,
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Color(colorVal).withValues(alpha: 0.14),
+                                      borderRadius: BorderRadius.circular(9),
+                                    ),
+                                    child: Icon(
+                                      Icons.credit_card_rounded,
+                                      color: Color(colorVal),
+                                      size: 19,
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: nameCtrl,
+                                      autofocus: existing == null,
+                                      textCapitalization:
+                                          TextCapitalization.words,
+                                      onChanged: (_) {
+                                        if (errorMsg != null) {
+                                          setModalState(() => errorMsg = null);
+                                        }
+                                      },
+                                      decoration: const InputDecoration(
+                                        hintText:
+                                            'Nome do Cartão (ex: Nubank, Itaú...)',
+                                        border: InputBorder.none,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  'Nubank',
+                                  'Itaú',
+                                  'Inter',
+                                  'Bradesco',
+                                  'C6 Bank',
+                                  'XP Visa',
+                                ].map((suggestion) {
+                                  return ActionChip(
+                                    label: Text(
+                                      suggestion,
+                                      style: const TextStyle(fontSize: 11.5),
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () {
+                                      setModalState(() {
+                                        nameCtrl.text = suggestion;
+                                        errorMsg = null;
+                                      });
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 6),
                             ],
                           ),
                         ),
@@ -506,24 +713,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () async {
-                          final name = nameCtrl.text.trim();
-                          if (name.isEmpty) return;
-                          final limit = CentavosCurrencyFormatter.parseValue(
-                            limitCtrl.text,
-                          );
-                          await widget.appState.saveCreditCard(
-                            CreditCardModel(
-                              id: existing?.id ?? _uuid.v4(),
-                              name: name,
-                              creditLimit: limit > 0 ? limit : 5000.0,
-                              closingDay: closingDay,
-                              dueDay: dueDay,
-                              colorValue: colorVal,
-                            ),
-                          );
-                          if (ctx.mounted) Navigator.of(ctx).pop();
-                        },
+                        onPressed: handleSaveCard,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.indigoPrimary,
                           foregroundColor: Colors.white,

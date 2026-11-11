@@ -668,7 +668,7 @@ class ImportedTransactionCandidate {
   final String title;
   final double amount;
   final DateTime date;
-  final TransactionType type;
+  TransactionType type;
   final String importHash;
   String? suggestedCategoryId;
   bool selected;

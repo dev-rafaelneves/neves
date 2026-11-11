@@ -5,6 +5,10 @@ import '../models/models.dart';
 /// Serviço local para importação de extratos e faturas em formato OFX, CSV ou texto extraído de PDF,
 /// com detecção de duplicatas via hash SHA-256 e sugestão inteligente de categoria por histórico/palavras-chave.
 class ImportService {
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
   static String computeImportHash({
     required DateTime date,
     required double amount,
@@ -24,6 +28,7 @@ class ImportService {
     required List<CategoryModel> categories,
     required List<TransactionModel> existingTransactions,
     bool forceExpenseForCreditCard = false,
+    bool invertSigns = false,
   }) {
     final ext = extension.toLowerCase().replaceAll('.', '');
     List<ImportedTransactionCandidate> rawCandidates;
@@ -32,11 +37,13 @@ class ImportService {
       rawCandidates = _parseOfx(
         content,
         forceExpenseForCreditCard: forceExpenseForCreditCard,
+        invertSigns: invertSigns,
       );
     } else {
       rawCandidates = _parseCsvOrLines(
         content,
         forceExpenseForCreditCard: forceExpenseForCreditCard,
+        invertSigns: invertSigns,
       );
     }
 
@@ -62,9 +69,29 @@ class ImportService {
     return rawCandidates;
   }
 
+  /// Inverte Receita <-> Despesa de todos os candidatos e recalcula a sugestão de categoria
+  static void invertAllCandidateTypes({
+    required List<ImportedTransactionCandidate> candidates,
+    required List<CategoryModel> categories,
+    required List<TransactionModel> existingTransactions,
+  }) {
+    for (final c in candidates) {
+      c.type = c.type == TransactionType.expense
+          ? TransactionType.income
+          : TransactionType.expense;
+      c.suggestedCategoryId = suggestCategory(
+        title: c.title,
+        type: c.type,
+        categories: categories,
+        existingTransactions: existingTransactions,
+      );
+    }
+  }
+
   static List<ImportedTransactionCandidate> _parseOfx(
     String content, {
     required bool forceExpenseForCreditCard,
+    required bool invertSigns,
   }) {
     final results = <ImportedTransactionCandidate>[];
     final blockRegex = RegExp(
@@ -80,6 +107,7 @@ class ImportService {
         final candidate = _extractOfxBlock(
           block,
           forceExpenseForCreditCard: forceExpenseForCreditCard,
+          invertSigns: invertSigns,
         );
         if (candidate != null) results.add(candidate);
       }
@@ -92,6 +120,7 @@ class ImportService {
       final candidate = _extractOfxBlock(
         parts[i],
         forceExpenseForCreditCard: forceExpenseForCreditCard,
+        invertSigns: invertSigns,
       );
       if (candidate != null) results.add(candidate);
     }
@@ -101,6 +130,7 @@ class ImportService {
   static ImportedTransactionCandidate? _extractOfxBlock(
     String block, {
     required bool forceExpenseForCreditCard,
+    required bool invertSigns,
   }) {
     String? extractTag(String tag) {
       final reg = RegExp('<$tag>([^<\r\n]+)', caseSensitive: false);
@@ -124,7 +154,13 @@ class ImportService {
     }
 
     final memo = extractTag('MEMO') ?? extractTag('NAME') ?? 'Lançamento OFX';
-    final isExpense = forceExpenseForCreditCard ? true : parsedAmt < 0;
+    bool isExpense = forceExpenseForCreditCard
+        ? (parsedAmt > 0)
+        : (parsedAmt < 0);
+    if (invertSigns) {
+      isExpense = !isExpense;
+    }
+
     final absAmount = parsedAmt.abs();
     final hash = computeImportHash(date: date, amount: absAmount, title: memo);
 
@@ -140,9 +176,41 @@ class ImportService {
   static List<ImportedTransactionCandidate> _parseCsvOrLines(
     String content, {
     required bool forceExpenseForCreditCard,
+    required bool invertSigns,
   }) {
     final results = <ImportedTransactionCandidate>[];
     final lines = const LineSplitter().convert(content);
+
+    // Detecta automaticamente o cabeçalho de fatura do Nubank (date,title,amount ou date,category,title,amount),
+    // onde valores positivos (+) são compras (Despesas) e valores negativos (-) são pagamentos/estornos (Receitas).
+    bool isNubankPositiveExpenseCsv = false;
+    bool hasCategoryColumn = false;
+
+    for (final rawLine in lines) {
+      final lower = rawLine.trim().toLowerCase();
+      if (lower.isEmpty) continue;
+      if (lower.startsWith('date') && lower.contains('amount')) {
+        isNubankPositiveExpenseCsv = true;
+        if (lower.contains('category')) {
+          hasCategoryColumn = true;
+        }
+        break;
+      }
+      if (lower.startsWith('data') || lower.startsWith('"data"')) {
+        break;
+      }
+    }
+
+    // Também detecta heurística Nubank quando não há cabeçalho mas há linhas ISO YYYY-MM-DD com "pagamento recebido" negativo
+    if (!isNubankPositiveExpenseCsv) {
+      for (final rawLine in lines) {
+        final lower = rawLine.trim().toLowerCase();
+        if (lower.contains('pagamento recebido') && lower.contains('-')) {
+          isNubankPositiveExpenseCsv = true;
+          break;
+        }
+      }
+    }
 
     for (final rawLine in lines) {
       final line = rawLine.trim();
@@ -152,7 +220,8 @@ class ImportService {
       final lower = line.toLowerCase();
       if (lower.startsWith('data') ||
           lower.startsWith('date') ||
-          lower.startsWith('"data"')) {
+          lower.startsWith('"data"') ||
+          lower.startsWith('"date"')) {
         continue;
       }
 
@@ -184,15 +253,37 @@ class ImportService {
             continue;
           }
         }
+        // Ignora coluna Identificador UUID do extrato da NuConta
+        if (_uuidRegex.hasMatch(col)) {
+          continue;
+        }
         textParts.add(col);
       }
 
       if (foundDate != null && foundAmount != null) {
-        final title =
-            textParts.isNotEmpty ? textParts.join(' - ') : 'Lançamento Importado';
-        // No CSV de fatura do Nubank (date,category,title,amount), valores positivos são compras
-        final isExpense =
-            forceExpenseForCreditCard ? true : (foundAmount < 0);
+        String title;
+        if (hasCategoryColumn && textParts.length >= 2) {
+          // Em date,category,title,amount do Nubank, textParts[0] é category e textParts[1..] é o title
+          title = textParts.sublist(1).join(' - ');
+        } else {
+          title = textParts.isNotEmpty
+              ? textParts.join(' - ')
+              : 'Lançamento Importado';
+        }
+
+        // Define se positivo é despesa (padrão fatura Nubank / cartão de crédito)
+        // ou se negativo é despesa (padrão extrato conta corrente)
+        final bool positiveMeansExpense =
+            forceExpenseForCreditCard || isNubankPositiveExpenseCsv;
+
+        bool isExpense = positiveMeansExpense
+            ? (foundAmount > 0)
+            : (foundAmount < 0);
+
+        if (invertSigns) {
+          isExpense = !isExpense;
+        }
+
         final absAmount = foundAmount.abs();
         final hash = computeImportHash(
           date: foundDate,

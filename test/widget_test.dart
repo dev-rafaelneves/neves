@@ -82,8 +82,29 @@ Data,Descrição,Valor
     expect(candidates.length, 2);
     expect(candidates[0].title, 'Uber Viagem');
     expect(candidates[0].amount, 35.90);
+    expect(candidates[0].type, TransactionType.expense);
     expect(candidates[0].suggestedCategoryId, 'cat_transporte');
     expect(candidates[1].suggestedCategoryId, 'cat_mercado');
+
+    // Testa CSV de Fatura do Nubank (date,category,title,amount) onde positivo é compra (Despesa) e negativo é pagamento/estorno (Receita)
+    const nubankInvoiceCsv = '''
+date,category,title,amount
+2026-11-10,transporte,Uber *Uber *Trip,35.90
+2026-11-05,,Pagamento recebido,-1250.00
+''';
+
+    final nubankCandidates = ImportService.parseStatementContent(
+      content: nubankInvoiceCsv,
+      extension: 'csv',
+      categories: appState.categories,
+      existingTransactions: appState.transactions,
+    );
+
+    expect(nubankCandidates.length, 2);
+    expect(nubankCandidates[0].title, 'Uber *Uber *Trip');
+    expect(nubankCandidates[0].type, TransactionType.expense);
+    expect(nubankCandidates[1].title, 'Pagamento recebido');
+    expect(nubankCandidates[1].type, TransactionType.income);
   });
 
   testWidgets('Renderiza MainShell Apple HIG com 4 abas e Modo Discreto', (tester) async {

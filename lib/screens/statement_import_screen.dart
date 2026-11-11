@@ -21,10 +21,13 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
   static const _uuid = Uuid();
 
   bool _importToCard = false;
+  bool _invertSigns = false;
   String? _selectedAccountId;
   String? _selectedCardId;
   List<ImportedTransactionCandidate> _candidates = [];
   String? _loadedFileName;
+  String? _rawContent;
+  String _rawExtension = 'csv';
 
   @override
   void initState() {
@@ -69,12 +72,15 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
   }
 
   void _parseContent(String content, String ext, String sourceLabel) {
+    _rawContent = content;
+    _rawExtension = ext;
     final parsed = ImportService.parseStatementContent(
       content: content,
       extension: ext,
       categories: widget.appState.categories,
       existingTransactions: widget.appState.transactions,
       forceExpenseForCreditCard: _importToCard,
+      invertSigns: _invertSigns,
     );
     HapticFeedback.lightImpact();
     setState(() {
@@ -83,12 +89,63 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
     });
   }
 
+  void _handleInvertAll() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _invertSigns = !_invertSigns;
+      ImportService.invertAllCandidateTypes(
+        candidates: _candidates,
+        categories: widget.appState.categories,
+        existingTransactions: widget.appState.transactions,
+      );
+    });
+  }
+
+  void _toggleSingleCandidateType(ImportedTransactionCandidate c) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      c.type = c.type == TransactionType.expense
+          ? TransactionType.income
+          : TransactionType.expense;
+      c.suggestedCategoryId = ImportService.suggestCategory(
+        title: c.title,
+        type: c.type,
+        categories: widget.appState.categories,
+        existingTransactions: widget.appState.transactions,
+      );
+    });
+  }
+
+  Future<void> _quickCreateNubankCard() async {
+    HapticFeedback.mediumImpact();
+    final card = CreditCardModel(
+      id: _uuid.v4(),
+      name: 'Nubank',
+      creditLimit: 5000.0,
+      closingDay: 5,
+      dueDay: 12,
+      colorValue: 0xFF059669,
+    );
+    await widget.appState.saveCreditCard(card);
+    setState(() {
+      _selectedCardId = card.id;
+      _importToCard = true;
+    });
+  }
+
   Future<void> _confirmImport() async {
     final selected = _candidates.where((c) => c.selected).toList();
     if (selected.isEmpty) return;
 
     final state = widget.appState;
-    final card = _importToCard ? state.getCardById(_selectedCardId) : null;
+    CreditCardModel? card;
+    if (_importToCard) {
+      if (state.creditCards.isEmpty) {
+        await _quickCreateNubankCard();
+      }
+      _selectedCardId ??= state.creditCards.first.id;
+      card = state.getCardById(_selectedCardId);
+    }
 
     for (final item in selected) {
       final compMonth = card != null
@@ -171,8 +228,17 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                             child: ChoiceChip(
                               label: const Text('Conta Bancária'),
                               selected: !_importToCard,
-                              onSelected: (_) =>
-                                  setState(() => _importToCard = false),
+                              onSelected: (_) {
+                                setState(() => _importToCard = false);
+                                if (_rawContent != null &&
+                                    _loadedFileName != null) {
+                                  _parseContent(
+                                    _rawContent!,
+                                    _rawExtension,
+                                    _loadedFileName!,
+                                  );
+                                }
+                              },
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -180,31 +246,80 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                             child: ChoiceChip(
                               label: const Text('Fatura de Cartão'),
                               selected: _importToCard,
-                              onSelected: state.creditCards.isNotEmpty
-                                  ? (_) => setState(() => _importToCard = true)
-                                  : null,
+                              onSelected: (_) {
+                                setState(() => _importToCard = true);
+                                if (_rawContent != null &&
+                                    _loadedFileName != null) {
+                                  _parseContent(
+                                    _rawContent!,
+                                    _rawExtension,
+                                    _loadedFileName!,
+                                  );
+                                }
+                              },
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      if (_importToCard && state.creditCards.isNotEmpty)
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedCardId,
-                          decoration: const InputDecoration(
-                            labelText: 'Selecione o Cartão de Crédito',
-                            isDense: true,
-                          ),
-                          items: state.creditCards
-                              .map(
-                                (c) => DropdownMenuItem(
-                                  value: c.id,
-                                  child: Text(c.name),
+                      if (_importToCard)
+                        if (state.creditCards.isNotEmpty)
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedCardId ??
+                                state.creditCards.first.id,
+                            decoration: const InputDecoration(
+                              labelText: 'Selecione o Cartão de Crédito',
+                              isDense: true,
+                            ),
+                            items: state.creditCards
+                                .map(
+                                  (c) => DropdownMenuItem(
+                                    value: c.id,
+                                    child: Text(c.name),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _selectedCardId = v),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.indigoSoft,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.credit_card_rounded,
+                                  color: AppColors.indigoPrimary,
+                                  size: 20,
                                 ),
-                              )
-                              .toList(),
-                          onChanged: (v) => setState(() => _selectedCardId = v),
-                        )
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    'Nenhum cartão cadastrado ainda.',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.lightTextPrimary,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _quickCreateNubankCard,
+                                  child: const Text(
+                                    '+ Criar Cartão Nubank',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.indigoPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
                       else
                         DropdownButtonFormField<String>(
                           initialValue: _selectedAccountId,
@@ -304,14 +419,33 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
 
               if (_loadedFileName != null) ...[
                 const SizedBox(height: 16),
-                Text(
-                  'FONTE: ${_loadedFileName!.toUpperCase()} (${_candidates.length} ITENS ENCONTRADOS)',
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.6,
-                    color: AppColors.indigoPrimary,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'FONTE: ${_loadedFileName!.toUpperCase()} (${_candidates.length} ITENS)',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: AppColors.indigoPrimary,
+                        ),
+                      ),
+                    ),
+                    if (_candidates.isNotEmpty)
+                      TextButton.icon(
+                        onPressed: _handleInvertAll,
+                        icon: const Icon(Icons.swap_vert_rounded, size: 17),
+                        label: const Text(
+                          'Inverter Compra ↔ Receita',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 if (_candidates.isEmpty)
@@ -363,13 +497,58 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                                     ],
                                   ),
                                 ),
-                                Text(
-                                  AppFormatters.currency(c.amount),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: c.type == TransactionType.income
-                                        ? AppColors.emerald
-                                        : AppColors.rose,
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () => _toggleSingleCandidateType(c),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 4,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          AppFormatters.currency(c.amount),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            color: c.type ==
+                                                    TransactionType.income
+                                                ? AppColors.emerald
+                                                : AppColors.rose,
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: (c.type ==
+                                                        TransactionType.income
+                                                    ? AppColors.emerald
+                                                    : AppColors.rose)
+                                                .withValues(alpha: 0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            c.type == TransactionType.income
+                                                ? 'Receita ⇄'
+                                                : 'Despesa ⇄',
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: c.type ==
+                                                      TransactionType.income
+                                                  ? AppColors.emerald
+                                                  : AppColors.rose,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],

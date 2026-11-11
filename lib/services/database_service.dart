@@ -30,6 +30,9 @@ class DatabaseService {
         path,
         version: 1,
         onCreate: _onCreate,
+        onOpen: (db) async {
+          await _ensureTables(db);
+        },
       );
     } catch (_) {
       _database = null;
@@ -37,8 +40,12 @@ class DatabaseService {
   }
 
   static Future<void> _onCreate(Database db, int version) async {
+    await _ensureTables(db);
+  }
+
+  static Future<void> _ensureTables(Database db) async {
     await db.execute('''
-      CREATE TABLE accounts (
+      CREATE TABLE IF NOT EXISTS accounts (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         type TEXT NOT NULL,
@@ -52,7 +59,7 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE credit_cards (
+      CREATE TABLE IF NOT EXISTS credit_cards (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         credit_limit REAL NOT NULL,
@@ -65,7 +72,7 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE invoices (
+      CREATE TABLE IF NOT EXISTS invoices (
         id TEXT PRIMARY KEY,
         card_id TEXT NOT NULL,
         year_month TEXT NOT NULL,
@@ -76,7 +83,7 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE categories (
+      CREATE TABLE IF NOT EXISTS categories (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         type TEXT NOT NULL,
@@ -88,7 +95,7 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE transactions (
+      CREATE TABLE IF NOT EXISTS transactions (
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         amount REAL NOT NULL,
@@ -113,7 +120,7 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE budgets (
+      CREATE TABLE IF NOT EXISTS budgets (
         id TEXT PRIMARY KEY,
         category_id TEXT NOT NULL,
         year_month TEXT NOT NULL,
@@ -122,7 +129,7 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE goals (
+      CREATE TABLE IF NOT EXISTS goals (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         target_amount REAL NOT NULL,
@@ -134,7 +141,7 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE ai_insights (
+      CREATE TABLE IF NOT EXISTS ai_insights (
         id TEXT PRIMARY KEY,
         year_month TEXT NOT NULL UNIQUE,
         content_md TEXT NOT NULL,
@@ -147,155 +154,211 @@ class DatabaseService {
   // --- Accounts ---
   static Future<List<Account>> getAccounts() async {
     if (!isAvailable) return [];
-    final rows = await _database!.query('accounts');
-    return rows.map((r) => Account.fromMap(r)).toList();
+    try {
+      final rows = await _database!.query('accounts');
+      return rows.map((r) => Account.fromMap(r)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> saveAccount(Account account) async {
     if (!isAvailable) return;
-    await _database!.insert(
-      'accounts',
-      account.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await _database!.insert(
+        'accounts',
+        account.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   static Future<void> deleteAccount(String id) async {
     if (!isAvailable) return;
-    await _database!.delete('accounts', where: 'id = ?', whereArgs: [id]);
+    try {
+      await _database!.delete('accounts', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
   }
 
   // --- Credit Cards ---
   static Future<List<CreditCardModel>> getCreditCards() async {
     if (!isAvailable) return [];
-    final rows = await _database!.query('credit_cards');
-    return rows.map((r) => CreditCardModel.fromMap(r)).toList();
+    try {
+      final rows = await _database!.query('credit_cards');
+      return rows.map((r) => CreditCardModel.fromMap(r)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> saveCreditCard(CreditCardModel card) async {
     if (!isAvailable) return;
-    await _database!.insert(
-      'credit_cards',
-      card.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await _database!.insert(
+        'credit_cards',
+        card.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   static Future<void> deleteCreditCard(String id) async {
     if (!isAvailable) return;
-    await _database!.delete('credit_cards', where: 'id = ?', whereArgs: [id]);
+    try {
+      await _database!.delete('credit_cards', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
   }
 
   // --- Invoices ---
   static Future<List<CreditCardInvoice>> getInvoices() async {
     if (!isAvailable) return [];
-    final rows = await _database!.query('invoices');
-    return rows.map((r) => CreditCardInvoice.fromMap(r)).toList();
+    try {
+      final rows = await _database!.query('invoices');
+      return rows.map((r) => CreditCardInvoice.fromMap(r)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> saveInvoice(CreditCardInvoice invoice) async {
     if (!isAvailable) return;
-    await _database!.insert(
-      'invoices',
-      invoice.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await _database!.insert(
+        'invoices',
+        invoice.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   // --- Categories ---
   static Future<List<CategoryModel>> getCategories() async {
     if (!isAvailable) return [];
-    final rows = await _database!.query('categories');
-    return rows.map((r) => CategoryModel.fromMap(r)).toList();
+    try {
+      final rows = await _database!.query('categories');
+      return rows.map((r) => CategoryModel.fromMap(r)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> saveCategory(CategoryModel cat) async {
     if (!isAvailable) return;
-    await _database!.insert(
-      'categories',
-      cat.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await _database!.insert(
+        'categories',
+        cat.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   static Future<void> deleteCategory(String id) async {
     if (!isAvailable) return;
-    await _database!.delete('categories', where: 'id = ?', whereArgs: [id]);
+    try {
+      await _database!.delete('categories', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
   }
 
   // --- Transactions ---
   static Future<List<TransactionModel>> getTransactions() async {
     if (!isAvailable) return [];
-    final rows = await _database!.query(
-      'transactions',
-      orderBy: 'date_iso DESC',
-    );
-    return rows.map((r) => TransactionModel.fromMap(r)).toList();
+    try {
+      final rows = await _database!.query(
+        'transactions',
+        orderBy: 'date_iso DESC',
+      );
+      return rows.map((r) => TransactionModel.fromMap(r)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> saveTransaction(TransactionModel tx) async {
     if (!isAvailable) return;
-    await _database!.insert(
-      'transactions',
-      tx.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await _database!.insert(
+        'transactions',
+        tx.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   static Future<void> deleteTransaction(String id) async {
     if (!isAvailable) return;
-    await _database!.delete('transactions', where: 'id = ?', whereArgs: [id]);
+    try {
+      await _database!.delete('transactions', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
   }
 
   static Future<void> deleteInstallmentGroup(String groupId) async {
     if (!isAvailable) return;
-    await _database!.delete(
-      'transactions',
-      where: 'installment_group_id = ?',
-      whereArgs: [groupId],
-    );
+    try {
+      await _database!.delete(
+        'transactions',
+        where: 'installment_group_id = ?',
+        whereArgs: [groupId],
+      );
+    } catch (_) {}
   }
 
   // --- Budgets ---
   static Future<List<BudgetModel>> getBudgets() async {
     if (!isAvailable) return [];
-    final rows = await _database!.query('budgets');
-    return rows.map((r) => BudgetModel.fromMap(r)).toList();
+    try {
+      final rows = await _database!.query('budgets');
+      return rows.map((r) => BudgetModel.fromMap(r)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> saveBudget(BudgetModel budget) async {
     if (!isAvailable) return;
-    await _database!.insert(
-      'budgets',
-      budget.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await _database!.insert(
+        'budgets',
+        budget.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   static Future<void> deleteBudget(String id) async {
     if (!isAvailable) return;
-    await _database!.delete('budgets', where: 'id = ?', whereArgs: [id]);
+    try {
+      await _database!.delete('budgets', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
   }
 
   // --- Goals ---
   static Future<List<GoalModel>> getGoals() async {
     if (!isAvailable) return [];
-    final rows = await _database!.query('goals');
-    return rows.map((r) => GoalModel.fromMap(r)).toList();
+    try {
+      final rows = await _database!.query('goals');
+      return rows.map((r) => GoalModel.fromMap(r)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> saveGoal(GoalModel goal) async {
     if (!isAvailable) return;
-    await _database!.insert(
-      'goals',
-      goal.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await _database!.insert(
+        'goals',
+        goal.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   static Future<void> deleteGoal(String id) async {
     if (!isAvailable) return;
-    await _database!.delete('goals', where: 'id = ?', whereArgs: [id]);
+    try {
+      await _database!.delete('goals', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
   }
 
   // --- AI Insights ---
@@ -304,14 +367,18 @@ class DatabaseService {
       return inMemoryAiInsights[yearMonth];
     }
     if (!isAvailable) return null;
-    final rows = await _database!.query(
-      'ai_insights',
-      where: 'year_month = ?',
-      whereArgs: [yearMonth],
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return rows.first['content_md'] as String?;
+    try {
+      final rows = await _database!.query(
+        'ai_insights',
+        where: 'year_month = ?',
+        whereArgs: [yearMonth],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      return rows.first['content_md'] as String?;
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<void> saveAiInsight({
@@ -321,29 +388,33 @@ class DatabaseService {
   }) async {
     inMemoryAiInsights[yearMonth] = contentMd;
     if (!isAvailable) return;
-    await _database!.insert(
-      'ai_insights',
-      {
-        'id': 'insight_$yearMonth',
-        'year_month': yearMonth,
-        'content_md': contentMd,
-        'model': model,
-        'created_at_iso': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      await _database!.insert(
+        'ai_insights',
+        {
+          'id': 'insight_$yearMonth',
+          'year_month': yearMonth,
+          'content_md': contentMd,
+          'model': model,
+          'created_at_iso': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   static Future<void> clearAllData() async {
     inMemoryAiInsights.clear();
     if (!isAvailable) return;
-    await _database!.delete('transactions');
-    await _database!.delete('invoices');
-    await _database!.delete('budgets');
-    await _database!.delete('goals');
-    await _database!.delete('credit_cards');
-    await _database!.delete('accounts');
-    await _database!.delete('categories');
-    await _database!.delete('ai_insights');
+    try {
+      await _database!.delete('transactions');
+      await _database!.delete('invoices');
+      await _database!.delete('budgets');
+      await _database!.delete('goals');
+      await _database!.delete('credit_cards');
+      await _database!.delete('accounts');
+      await _database!.delete('categories');
+      await _database!.delete('ai_insights');
+    } catch (_) {}
   }
 }

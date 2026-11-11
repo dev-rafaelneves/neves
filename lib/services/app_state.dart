@@ -131,6 +131,18 @@ class AppState extends ChangeNotifier {
       _transactions = await DatabaseService.getTransactions();
       _budgets = await DatabaseService.getBudgets();
       _goals = await DatabaseService.getGoals();
+      if (_creditCards.isEmpty && _prefs != null) {
+        final rawCards = _prefs!.getString('neves_cards');
+        if (rawCards != null && rawCards.isNotEmpty) {
+          try {
+            final list = jsonDecode(rawCards) as List<dynamic>;
+            _creditCards = list
+                .map((e) =>
+                    CreditCardModel.fromMap(Map<String, dynamic>.from(e as Map)))
+                .toList();
+          } catch (_) {}
+        }
+      }
     } else {
       // Fallback SharedPreferences caso rode na Web ou teste sem sqflite
       _loadFromPrefsFallback();
@@ -165,7 +177,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _persistFallbackIfNeeded() async {
-    if (DatabaseService.isAvailable || _prefs == null) return;
+    if (_prefs == null) return;
     await _prefs!.setString(
       'neves_accounts',
       jsonEncode(_accounts.map((e) => e.toMap()).toList()),
