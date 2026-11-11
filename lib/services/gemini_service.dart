@@ -302,7 +302,6 @@ DIRETRIZES DA RESPOSTA:
     final itemsPayload = <Map<String, dynamic>>[];
     for (int i = 0; i < candidates.length; i++) {
       final c = candidates[i];
-      if (c.operationType == StatementOperationType.transfer) continue;
       itemsPayload.add({
         'i': i,
         'title': c.title,

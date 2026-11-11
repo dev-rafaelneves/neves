@@ -664,104 +664,13 @@ class GoalModel {
       );
 }
 
-enum StatementOperationType {
-  expense('Despesa', 'DESPESA'),
-  income('Receita', 'RECEITA'),
-  transfer('Transferência', 'TRANSFERENCIA'),
-  cofrinhoDeposit('Guardar no Cofrinho', 'GUARDAR_COFRINHO'),
-  cofrinhoWithdraw('Retirada do Cofrinho', 'RESGATE_COFRINHO'),
-  cofrinhoYield('Rendimento Cofrinho', 'RENDIMENTO_COFRINHO');
-
-  final String label;
-  final String csvCode;
-  const StatementOperationType(this.label, this.csvCode);
-
-  bool get isCofrinho =>
-      this == StatementOperationType.cofrinhoDeposit ||
-      this == StatementOperationType.cofrinhoWithdraw ||
-      this == StatementOperationType.cofrinhoYield;
-
-  TransactionType get transactionType {
-    switch (this) {
-      case StatementOperationType.expense:
-      case StatementOperationType.cofrinhoDeposit:
-        return TransactionType.expense;
-      case StatementOperationType.income:
-      case StatementOperationType.cofrinhoWithdraw:
-      case StatementOperationType.cofrinhoYield:
-        return TransactionType.income;
-      case StatementOperationType.transfer:
-        return TransactionType.transfer;
-    }
-  }
-
-  static StatementOperationType? tryParseCsvToken(String raw) {
-    final clean = raw
-        .trim()
-        .toUpperCase()
-        .replaceAll('Á', 'A')
-        .replaceAll('Ã', 'A')
-        .replaceAll('Â', 'A')
-        .replaceAll('É', 'E')
-        .replaceAll('Ê', 'E')
-        .replaceAll('Í', 'I')
-        .replaceAll('Ó', 'O')
-        .replaceAll('Ô', 'O')
-        .replaceAll('Õ', 'O')
-        .replaceAll('Ú', 'U')
-        .replaceAll('Ç', 'C')
-        .replaceAll(' ', '_');
-
-    switch (clean) {
-      case 'DESPESA':
-      case 'EXPENSE':
-      case 'SAIDA':
-      case 'DEBITO':
-      case 'COMPRA':
-        return StatementOperationType.expense;
-      case 'RECEITA':
-      case 'INCOME':
-      case 'ENTRADA':
-      case 'CREDITO':
-        return StatementOperationType.income;
-      case 'TRANSFERENCIA':
-      case 'TRANSFERENCIA_ENTRE_CONTAS':
-      case 'TRANSFER':
-        return StatementOperationType.transfer;
-      case 'GUARDAR_COFRINHO':
-      case 'APORTE_COFRINHO':
-      case 'DEPOSITO_COFRINHO':
-      case 'DINHEIRO_GUARDADO':
-      case 'GUARDAR_NO_COFRINHO':
-      case 'RESERVA_COFRINHO':
-        return StatementOperationType.cofrinhoDeposit;
-      case 'RESGATE_COFRINHO':
-      case 'RETIRADA_COFRINHO':
-      case 'DINHEIRO_RETIRADO':
-      case 'RETIRAR_COFRINHO':
-      case 'RETIRADA_DO_COFRINHO':
-        return StatementOperationType.cofrinhoWithdraw;
-      case 'RENDIMENTO_COFRINHO':
-      case 'RENDIMENTOS_COFRINHO':
-      case 'RENDIMENTO':
-      case 'RENDIMENTOS':
-        return StatementOperationType.cofrinhoYield;
-      default:
-        return null;
-    }
-  }
-}
-
 class ImportedTransactionCandidate {
   final String title;
   final double amount;
   final DateTime date;
   TransactionType type;
-  StatementOperationType operationType;
   final String importHash;
   String? suggestedCategoryId;
-  String? suggestedGoalId;
-  String? destinationAccountId;
   bool selected;
   bool isDuplicate;
 
@@ -770,19 +679,11 @@ class ImportedTransactionCandidate {
     required this.amount,
     required this.date,
     required this.type,
-    StatementOperationType? operationType,
     required this.importHash,
     this.suggestedCategoryId,
-    this.suggestedGoalId,
-    this.destinationAccountId,
     this.selected = true,
     this.isDuplicate = false,
-  }) : operationType = operationType ??
-            (type == TransactionType.transfer
-                ? StatementOperationType.transfer
-                : (type == TransactionType.income
-                    ? StatementOperationType.income
-                    : StatementOperationType.expense));
+  });
 }
 
 class BackupPreviewInfo {
