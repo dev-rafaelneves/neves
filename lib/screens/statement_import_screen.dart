@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../services/app_state.dart';
+import '../services/gemini_service.dart';
 import '../services/import_service.dart';
 import '../theme/app_theme.dart';
 
@@ -22,6 +23,8 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
 
   bool _importToCard = false;
   bool _invertSigns = false;
+  bool _isAiCategorizing = false;
+  bool _aiCategorizedSuccess = false;
   String? _selectedAccountId;
   String? _selectedCardId;
   List<ImportedTransactionCandidate> _candidates = [];
@@ -86,19 +89,72 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
     setState(() {
       _candidates = parsed;
       _loadedFileName = sourceLabel;
+      _aiCategorizedSuccess = false;
     });
+
+    // Dispara categorização automática por IA caso haja chave configurada
+    _runAiCategorization(silentIfNoKey: true);
+  }
+
+  Future<void> _runAiCategorization({bool silentIfNoKey = false}) async {
+    if (_candidates.isEmpty || _isAiCategorizing) return;
+
+    final hasKey = await GeminiService.hasApiKey();
+    if (!hasKey) {
+      if (!silentIfNoKey && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Configure sua chave da API Gemini na aba Ajustes para categorizar com IA.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isAiCategorizing = true);
+    }
+
+    try {
+      final mapping = await GeminiService.categorizeImportedTransactions(
+        candidates: _candidates,
+        categories: widget.appState.categories,
+      );
+      if (!mounted) return;
+      setState(() {
+        mapping.forEach((idx, catId) {
+          if (idx >= 0 && idx < _candidates.length) {
+            _candidates[idx].suggestedCategoryId = catId;
+          }
+        });
+        _isAiCategorizing = false;
+        _aiCategorizedSuccess = mapping.isNotEmpty;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isAiCategorizing = false);
+      if (!silentIfNoKey) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao categorizar com IA: $e')),
+        );
+      }
+    }
   }
 
   void _handleInvertAll() {
     HapticFeedback.selectionClick();
     setState(() {
       _invertSigns = !_invertSigns;
+      _aiCategorizedSuccess = false;
       ImportService.invertAllCandidateTypes(
         candidates: _candidates,
         categories: widget.appState.categories,
         existingTransactions: widget.appState.transactions,
       );
     });
+    _runAiCategorization(silentIfNoKey: true);
   }
 
   void _toggleSingleCandidateType(ImportedTransactionCandidate c) {
@@ -434,16 +490,57 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                       ),
                     ),
                     if (_candidates.isNotEmpty)
-                      TextButton.icon(
-                        onPressed: _handleInvertAll,
-                        icon: const Icon(Icons.swap_vert_rounded, size: 17),
-                        label: const Text(
-                          'Inverter Compra ↔ Receita',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                      Wrap(
+                        spacing: 4,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _isAiCategorizing
+                                ? null
+                                : () => _runAiCategorization(
+                                      silentIfNoKey: false,
+                                    ),
+                            icon: _isAiCategorizing
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.auto_awesome_rounded,
+                                    size: 16,
+                                    color: _aiCategorizedSuccess
+                                        ? AppColors.emerald
+                                        : AppColors.indigoPrimary,
+                                  ),
+                            label: Text(
+                              _isAiCategorizing
+                                  ? 'IA Categorizando...'
+                                  : (_aiCategorizedSuccess
+                                      ? 'Categorizado c/ IA'
+                                      : 'Categorizar c/ IA'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _aiCategorizedSuccess
+                                    ? AppColors.emerald
+                                    : AppColors.indigoPrimary,
+                              ),
+                            ),
                           ),
-                        ),
+                          TextButton.icon(
+                            onPressed: _handleInvertAll,
+                            icon: const Icon(Icons.swap_vert_rounded, size: 17),
+                            label: const Text(
+                              'Inverter Sinal',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -577,8 +674,8 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                                       (cat) => DropdownMenuItem(
                                         value: cat.id,
                                         child: Text(
-                                          '${cat.name} (${cat.pillar.label})',
-                                          style: const TextStyle(fontSize: 12.5),
+                                          cat.name,
+                                          style: const TextStyle(fontSize: 13),
                                         ),
                                       ),
                                     )

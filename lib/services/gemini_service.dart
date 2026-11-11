@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import '../models/models.dart';
 import 'database_service.dart';
 import 'security_service.dart';
 
@@ -261,9 +262,106 @@ DIRETRIZES DA RESPOSTA:
     return text;
   }
 
+  /// Categoriza automaticamente uma lista de transações importadas (OFX/CSV/PDF) usando o Gemini IA.
+  /// Retorna um mapa {indexDaTransacao: categoryId} apenas para os itens em que a IA encontrou correspondência válida.
+  static Future<Map<int, String>> categorizeImportedTransactions({
+    required List<ImportedTransactionCandidate> candidates,
+    required List<CategoryModel> categories,
+  }) async {
+    if (candidates.isEmpty || categories.isEmpty) return {};
+
+    final key = await getApiKey();
+    if (key == null || key.isEmpty) {
+      throw StateError(
+        'Chave da API do Gemini não configurada. Configure em Ajustes para usar a categorização por IA.',
+      );
+    }
+
+    final expenseCats = categories
+        .where((c) => c.type == TransactionType.expense)
+        .map((c) => {'id': c.id, 'name': c.name})
+        .toList();
+    final incomeCats = categories
+        .where((c) => c.type == TransactionType.income)
+        .map((c) => {'id': c.id, 'name': c.name})
+        .toList();
+
+    final itemsPayload = <Map<String, dynamic>>[];
+    for (int i = 0; i < candidates.length; i++) {
+      final c = candidates[i];
+      itemsPayload.add({
+        'i': i,
+        'title': c.title,
+        'type': c.type == TransactionType.expense ? 'expense' : 'income',
+        'amount': c.amount,
+      });
+    }
+
+    final prompt = '''
+Você é um classificador inteligente de extratos bancários e faturas de cartão no Brasil (Nubank, Itaú, Inter, Bradesco, C6, etc.).
+Associe cada lançamento abaixo ao `id` da categoria mais adequada, respeitando o tipo (`expense` usa apenas CATEGORIAS DE DESPESA; `income` usa apenas CATEGORIAS DE RECEITA).
+
+CATEGORIAS DE DESPESA (expense):
+${jsonEncode(expenseCats)}
+
+CATEGORIAS DE RECEITA (income):
+${jsonEncode(incomeCats)}
+
+LANÇAMENTOS PARA CLASSIFICAR:
+${jsonEncode(itemsPayload)}
+
+Responda APENAS com um objeto JSON válido (sem blocos markdown ```json e sem texto extra) mapeando o índice "i" (como string) para o "id" exato da categoria escolhida.
+Exemplo de formato esperado:
+{"0": "cat_mercado", "1": "cat_transporte"}
+''';
+
+    final rawResponse = await _callGeminiApi(
+      key: key,
+      prompt: prompt,
+      maxOutputTokens: 1200,
+      temperature: 0.1,
+    );
+
+    String cleaned = rawResponse.trim();
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned
+          .replaceFirst(RegExp(r'^```[a-zA-Z]*\s*'), '')
+          .replaceFirst(RegExp(r'\s*```$'), '')
+          .trim();
+    }
+
+    final startBrace = cleaned.indexOf('{');
+    final endBrace = cleaned.lastIndexOf('}');
+    if (startBrace >= 0 && endBrace > startBrace) {
+      cleaned = cleaned.substring(startBrace, endBrace + 1);
+    }
+
+    final validIds = categories.map((c) => c.id).toSet();
+    final Map<int, String> result = {};
+
+    try {
+      final decoded = jsonDecode(cleaned) as Map<String, dynamic>;
+      decoded.forEach((k, v) {
+        final idx = int.tryParse(k);
+        final catId = v?.toString();
+        if (idx != null &&
+            idx >= 0 &&
+            idx < candidates.length &&
+            catId != null &&
+            validIds.contains(catId)) {
+          result[idx] = catId;
+        }
+      });
+    } catch (_) {}
+
+    return result;
+  }
+
   static Future<String> _callGeminiApi({
     required String key,
     required String prompt,
+    int maxOutputTokens = 750,
+    double temperature = 0.35,
   }) async {
     final modelsToTry = [
       _activeModel,
@@ -279,8 +377,8 @@ DIRETRIZES DA RESPOSTA:
         },
       ],
       'generationConfig': {
-        'maxOutputTokens': 750,
-        'temperature': 0.35,
+        'maxOutputTokens': maxOutputTokens,
+        'temperature': temperature,
       },
     };
 

@@ -386,13 +386,18 @@ class ImportService {
       return validCats.first.id;
     }
 
-    // Heurística de despesas brasileiras
+    // Heurística de despesas brasileiras + categorias do CSV Nubank
     if (lower.contains('uber') ||
         lower.contains('99') ||
         lower.contains('posto') ||
         lower.contains('combust') ||
+        lower.contains('shell') ||
+        lower.contains('ipiranga') ||
+        lower.contains('petrobras') ||
         lower.contains('estacionamento') ||
-        lower.contains('sem parar')) {
+        lower.contains('sem parar') ||
+        lower.contains('veloe') ||
+        lower.contains('pedagio')) {
       return findByKeyword('transporte');
     }
     if (lower.contains('ifood') ||
@@ -400,8 +405,15 @@ class ImportService {
         lower.contains('padaria') ||
         lower.contains('lanch') ||
         lower.contains('burger') ||
+        lower.contains('mcdonald') ||
+        lower.contains('bk ') ||
+        lower.contains('outback') ||
         lower.contains('pizza') ||
-        lower.contains('cafe')) {
+        lower.contains('sushi') ||
+        lower.contains('acai') ||
+        lower.contains('açaí') ||
+        lower.contains('cafe') ||
+        lower.contains('café')) {
       return findByKeyword('restaurante') ?? findByKeyword('alimenta');
     }
     if (lower.contains('mercado') ||
@@ -409,34 +421,99 @@ class ImportService {
         lower.contains('atacad') ||
         lower.contains('carrefour') ||
         lower.contains('assai') ||
-        lower.contains('pao de acucar')) {
+        lower.contains('assaí') ||
+        lower.contains('pao de acucar') ||
+        lower.contains('hortifruti') ||
+        lower.contains(' sacolao') ||
+        lower.contains('acougue')) {
       return findByKeyword('mercado') ?? findByKeyword('alimenta');
     }
     if (lower.contains('netflix') ||
         lower.contains('spotify') ||
         lower.contains('prime') ||
         lower.contains('icloud') ||
+        lower.contains('apple.com/bill') ||
         lower.contains('google') ||
         lower.contains('youtube') ||
-        lower.contains('chatgpt')) {
+        lower.contains('chatgpt') ||
+        lower.contains('openai') ||
+        lower.contains('claude') ||
+        lower.contains('disney') ||
+        lower.contains('hbo') ||
+        lower.contains('max')) {
       return findByKeyword('assinatura');
     }
     if (lower.contains('farmacia') ||
+        lower.contains('farmácia') ||
         lower.contains('droga') ||
         lower.contains('raia') ||
         lower.contains('pacheco') ||
+        lower.contains('pague menos') ||
+        lower.contains('panvel') ||
         lower.contains('hospital') ||
         lower.contains('unimed') ||
-        lower.contains('medico')) {
+        lower.contains('medico') ||
+        lower.contains('médico') ||
+        lower.contains('clinica') ||
+        lower.contains('clínica') ||
+        lower.contains('laboratorio') ||
+        lower.contains('smartfit') ||
+        lower.contains('gympass') ||
+        lower.contains('wellhub')) {
       return findByKeyword('saúde') ?? findByKeyword('saude');
+    }
+    if (lower.contains('escola') ||
+        lower.contains('faculdade') ||
+        lower.contains('curso') ||
+        lower.contains('udemy') ||
+        lower.contains('alura') ||
+        lower.contains('livraria')) {
+      return findByKeyword('educação') ?? findByKeyword('educacao');
+    }
+    if (lower.contains('mercado livre') ||
+        lower.contains('mercadolivre') ||
+        lower.contains('meli') ||
+        lower.contains('shopee') ||
+        lower.contains('amazon') ||
+        lower.contains('shein') ||
+        lower.contains('magalu') ||
+        lower.contains('magazine') ||
+        lower.contains('renner') ||
+        lower.contains('riachuelo') ||
+        lower.contains('cea') ||
+        lower.contains('zara') ||
+        lower.contains('centauro') ||
+        lower.contains('nike')) {
+      return findByKeyword('compras') ?? findByKeyword('vestuário');
+    }
+    if (lower.contains('cinema') ||
+        lower.contains('ingresso') ||
+        lower.contains('steam') ||
+        lower.contains('playstation') ||
+        lower.contains('xbox') ||
+        lower.contains('nintendo') ||
+        lower.contains('hotel') ||
+        lower.contains('airbnb') ||
+        lower.contains('booking') ||
+        lower.contains('latam') ||
+        lower.contains('azul') ||
+        lower.contains('gol ')) {
+      return findByKeyword('lazer') ?? findByKeyword('viagens');
     }
     if (lower.contains('aluguel') ||
         lower.contains('condominio') ||
+        lower.contains('condomínio') ||
         lower.contains('energia') ||
         lower.contains('enel') ||
+        lower.contains('cpfl') ||
+        lower.contains('light') ||
         lower.contains('sabesp') ||
+        lower.contains('saneago') ||
+        lower.contains('copasa') ||
+        lower.contains('comgas') ||
         lower.contains('vivo') ||
         lower.contains('claro') ||
+        lower.contains('tim') ||
         lower.contains('internet')) {
       return findByKeyword('moradia');
     }

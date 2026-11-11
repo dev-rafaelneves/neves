@@ -130,6 +130,12 @@ date,category,title,amount
     await tester.pumpAndSettle();
     expect(find.text('Novo Lançamento'), findsOneWidget);
     expect(find.text('IDENTIFICAÇÃO & CATEGORIA'), findsOneWidget);
+
+    // Alterna para Transferência para validar que Conta de Origem e Conta de Destino não causam RenderFlex overflow
+    await tester.tap(find.text('Transferência'));
+    await tester.pumpAndSettle();
+    expect(find.text('Conta de Origem'), findsOneWidget);
+    expect(find.text('Conta de Destino'), findsOneWidget);
   });
 
   test('CentavosCurrencyFormatter formata digitação estilo Nubank da direita para a esquerda', () {

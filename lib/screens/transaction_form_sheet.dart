@@ -860,12 +860,16 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    selectedCard?.name ?? 'Selecionar',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.indigoPrimary,
+                                  Flexible(
+                                    child: Text(
+                                      selectedCard?.name ?? 'Selecionar',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.indigoPrimary,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 4),
@@ -890,14 +894,18 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      _installments == 1
-                                          ? '1x à vista'
-                                          : '${_installments}x',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.indigoPrimary,
+                                    Flexible(
+                                      child: Text(
+                                        _installments == 1
+                                            ? '1x à vista'
+                                            : '${_installments}x',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.indigoPrimary,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 4),
@@ -929,6 +937,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                   Flexible(
                                     child: Text(
                                       selectedAcc?.name ?? 'Selecionar',
+                                      maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 15,
@@ -956,12 +965,16 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      destAcc?.name ?? 'Selecionar',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.emerald,
+                                    Flexible(
+                                      child: Text(
+                                        destAcc?.name ?? 'Selecionar',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.emerald,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 4),
