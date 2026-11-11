@@ -346,6 +346,193 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
     }
   }
 
+  ({String title, String subtitle, String prompt}) _promptForCurrentMode() {
+    switch (_targetMode) {
+      case ImportTargetMode.checking:
+        return (
+          title: 'Prompt — Conta Corrente (Mês Atual)',
+          subtitle:
+              'Envie ao assistente do seu banco para gerar o CSV de receitas e despesas da conta corrente no mês atual.',
+          prompt:
+              '''Gere uma tabela em formato CSV (separado por ponto e vírgula ";") contendo apenas as receitas e despesas da minha Conta Corrente no mês atual, com exatamente 3 colunas: Data;Descricao;Valor
+
+Regras obrigatórias:
+1. Inclua somente entradas (salário, Pix recebido de terceiros, depósitos, reembolsos) e saídas de consumo/contas (Pix enviado a terceiros/comércios, boletos pagos, compras no débito, tarifas).
+2. NÃO inclua transferências entre contas da minha própria titularidade, aplicações/resgates de Cofrinhos/Reservas nem compras no cartão de crédito.
+3. Coluna Data no formato DD/MM/AAAA.
+4. Coluna Descricao limpa, sem ponto e vírgula (;), informando o nome do pagador ou recebedor/estabelecimento.
+5. Coluna Valor em formato numérico com ponto decimal (sem "R\$"):
+   - POSITIVO para entradas/receitas (ex: 3500.00)
+   - NEGATIVO para saídas/despesas (ex: -45.90)
+6. Retorne apenas o bloco CSV pronto para copiar.''',
+        );
+      case ImportTargetMode.creditCard:
+        return (
+          title: 'Prompt — Fatura de Cartão (Mês Atual)',
+          subtitle:
+              'Envie ao assistente do seu banco para gerar o CSV de compras e estornos da fatura do cartão no mês atual.',
+          prompt:
+              '''Gere uma tabela em formato CSV (separado por ponto e vírgula ";") contendo todos os lançamentos da minha fatura de cartão de crédito do mês atual, com exatamente 3 colunas: Data;Descricao;Valor
+
+Regras obrigatórias:
+1. Inclua apenas compras no crédito (à vista ou parceladas), assinaturas recorrentes no cartão, IOF/encargos de fatura e estornos de compras.
+2. NÃO inclua o pagamento da fatura anterior.
+3. Coluna Data no formato DD/MM/AAAA.
+4. Coluna Descricao com o nome limpo do estabelecimento (se for parcelado, inclua a parcela no final, ex: "Mercado Livre 02/10"). Não use ponto e vírgula (;).
+5. Coluna Valor em formato numérico com ponto decimal (sem "R\$"):
+   - NEGATIVO para compras e cobranças (ex: -129.90)
+   - POSITIVO apenas para estornos/descontos na fatura (ex: 29.90)
+6. Retorne apenas o bloco CSV pronto para copiar.''',
+        );
+      case ImportTargetMode.cofrinho:
+        return (
+          title: 'Prompt — Cofrinho / Caixinha (Mês Atual)',
+          subtitle:
+              'Envie ao assistente do seu banco para gerar o CSV de aportes, resgates e rendimentos do Cofrinho no mês atual.',
+          prompt:
+              '''Gere uma tabela em formato CSV (separado por ponto e vírgula ";") contendo todas as movimentações dos meus Cofrinhos / Reservas / Dinheiro Guardado no mês atual, com exatamente 3 colunas: Data;Descricao;Valor
+
+Regras obrigatórias:
+1. Inclua dinheiro guardado (aportes), dinheiro retirado (resgates) e rendimentos líquidos creditados nos cofrinhos no mês atual.
+2. Coluna Data no formato DD/MM/AAAA.
+3. Coluna Descricao padronizada sem ponto e vírgula (;):
+   - Quando guardar dinheiro: "Aporte Cofrinho - [Nome do Cofrinho]"
+   - Quando retirar dinheiro: "Resgate Cofrinho - [Nome do Cofrinho]"
+   - Quando for rendimento: "Rendimento Cofrinho - [Nome do Cofrinho]"
+4. Coluna Valor em formato numérico com ponto decimal (sem "R\$"):
+   - NEGATIVO quando o dinheiro saiu da conta corrente para o cofrinho (Aporte, ex: -200.00)
+   - POSITIVO quando o dinheiro voltou do cofrinho para a conta (Resgate, ex: 150.00) ou quando rendeu (Rendimento, ex: 12.45)
+5. Retorne apenas o bloco CSV pronto para copiar.''',
+        );
+      case ImportTargetMode.transfer:
+        return (
+          title: 'Prompt — Transferência entre Contas (Mês Atual)',
+          subtitle:
+              'Envie ao assistente do seu banco para gerar o CSV de transferências entre suas próprias contas no mês atual.',
+          prompt:
+              '''Gere uma tabela em formato CSV (separado por ponto e vírgula ";") contendo apenas as transferências entre contas da minha própria titularidade (mesmo CPF) realizadas no mês atual, com exatamente 3 colunas: Data;Descricao;Valor
+
+Regras obrigatórias:
+1. Inclua apenas Pix ou TED enviados para outras contas minhas ou recebidos de outras contas minhas.
+2. Coluna Data no formato DD/MM/AAAA.
+3. Coluna Descricao padronizada sem ponto e vírgula (;):
+   - Se saiu desta conta: "Transferencia enviada para [Nome do Banco Destino]"
+   - Se entrou nesta conta: "Transferencia recebida de [Nome do Banco Origem]"
+4. Coluna Valor em formato numérico com ponto decimal (sem "R\$"):
+   - NEGATIVO para transferências enviadas desta conta (ex: -500.00)
+   - POSITIVO para transferências recebidas nesta conta (ex: 500.00)
+5. Retorne apenas o bloco CSV pronto para copiar.''',
+        );
+    }
+  }
+
+  void _showPromptHelpDialog() {
+    HapticFeedback.lightImpact();
+    final info = _promptForCurrentMode();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(
+              Icons.help_outline_rounded,
+              color: AppColors.indigoPrimary,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                info.title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  info.subtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.darkBackground
+                        : AppColors.lightBackground,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDark
+                          ? AppColors.darkBorder
+                          : AppColors.lightBorder,
+                    ),
+                  ),
+                  child: SelectableText(
+                    info.prompt,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.45,
+                      fontFamily: 'monospace',
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Fechar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: info.prompt));
+              HapticFeedback.mediumImpact();
+              if (ctx.mounted) {
+                Navigator.of(ctx).pop();
+              }
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${info.title} copiado!'),
+                    backgroundColor: AppColors.emerald,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.indigoPrimary,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.copy_rounded, size: 17),
+            label: const Text('Copiar Prompt'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _confirmImport() async {
     final selected = _candidates.where((c) => c.selected).toList();
     if (selected.isEmpty) return;
@@ -492,6 +679,16 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Importar Extrato / Fatura'),
+        actions: [
+          IconButton(
+            onPressed: _showPromptHelpDialog,
+            tooltip: 'Ver Prompt de CSV para este modo',
+            icon: const Icon(
+              Icons.help_outline_rounded,
+              color: AppColors.indigoPrimary,
+            ),
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -514,12 +711,53 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '1. O que você está importando?',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              '1. O que você está importando?',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: _showPromptHelpDialog,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.indigoPrimary.withValues(
+                                  alpha: 0.10,
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.help_outline_rounded,
+                                    size: 16,
+                                    color: AppColors.indigoPrimary,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Prompt CSV',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.indigoPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 10),
                       Row(

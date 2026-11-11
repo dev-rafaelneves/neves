@@ -174,7 +174,29 @@ class _AiInsightCardState extends State<AiInsightCard> {
                     ],
                   ),
                 ),
-                if (_insightText != null && !_isGenerating)
+                if (_insightText != null && !_isGenerating) ...[
+                  IconButton(
+                    onPressed: () async {
+                      await Clipboard.setData(
+                        ClipboardData(text: _insightText!),
+                      );
+                      HapticFeedback.selectionClick();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Diagnóstico copiado!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    tooltip: 'Copiar Diagnóstico',
+                    icon: const Icon(
+                      Icons.copy_rounded,
+                      size: 18,
+                      color: AppColors.indigoPrimary,
+                    ),
+                  ),
                   IconButton(
                     onPressed: () => _generateInsight(forceRefresh: true),
                     tooltip: 'Recalcular Diagnóstico',
@@ -184,6 +206,7 @@ class _AiInsightCardState extends State<AiInsightCard> {
                       color: AppColors.indigoPrimary,
                     ),
                   ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -238,15 +261,9 @@ class _AiInsightCardState extends State<AiInsightCard> {
                       : AppColors.lightBackground,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: SelectableText(
-                  _insightText!,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    height: 1.48,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.lightTextPrimary,
-                  ),
+                child: _MarkdownFormattedView(
+                  text: _insightText!,
+                  isDark: isDark,
                 ),
               )
             else
@@ -288,6 +305,219 @@ class _AiInsightCardState extends State<AiInsightCard> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Renderizador leve de Markdown para textos gerados pelo Gemini
+class _MarkdownFormattedView extends StatelessWidget {
+  final String text;
+  final bool isDark;
+
+  const _MarkdownFormattedView({required this.text, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = text.split('\n');
+    final widgets = <Widget>[];
+
+    for (var rawLine in lines) {
+      final line = rawLine.trim();
+      if (line.isEmpty) {
+        widgets.add(const SizedBox(height: 6));
+        continue;
+      }
+
+      if (line == '---' || line == '***' || line == '___') {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Divider(
+              height: 1,
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            ),
+          ),
+        );
+        continue;
+      }
+
+      if (line.startsWith('#### ')) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 3),
+            child: Text(
+              _stripInlineMarkers(line.substring(5)),
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: isDark
+                    ? AppColors.darkTextPrimary
+                    : AppColors.lightTextPrimary,
+              ),
+            ),
+          ),
+        );
+      } else if (line.startsWith('### ')) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Text(
+              _stripInlineMarkers(line.substring(4)),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isDark ? AppColors.indigoLight : AppColors.indigoPrimary,
+              ),
+            ),
+          ),
+        );
+      } else if (line.startsWith('## ')) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            child: Text(
+              _stripInlineMarkers(line.substring(3)),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: isDark
+                    ? AppColors.darkTextPrimary
+                    : AppColors.lightTextPrimary,
+              ),
+            ),
+          ),
+        );
+      } else if (line.startsWith('# ')) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            child: Text(
+              _stripInlineMarkers(line.substring(2)),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: isDark
+                    ? AppColors.darkTextPrimary
+                    : AppColors.lightTextPrimary,
+              ),
+            ),
+          ),
+        );
+      } else if (line.startsWith('- ') ||
+          line.startsWith('* ') ||
+          line.startsWith('• ')) {
+        final itemText = line.substring(2).trim();
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 5, left: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '•  ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.indigoLight
+                        : AppColors.indigoPrimary,
+                  ),
+                ),
+                Expanded(child: _buildRichLine(itemText)),
+              ],
+            ),
+          ),
+        );
+      } else if (RegExp(r'^\d+\.\s+').hasMatch(line)) {
+        final match = RegExp(r'^(\d+\.)\s+(.*)$').firstMatch(line)!;
+        final prefix = match.group(1)!;
+        final itemText = match.group(2)!;
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 5, left: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$prefix ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.indigoLight
+                        : AppColors.indigoPrimary,
+                  ),
+                ),
+                Expanded(child: _buildRichLine(itemText)),
+              ],
+            ),
+          ),
+        );
+      } else {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 5),
+            child: _buildRichLine(line),
+          ),
+        );
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+  }
+
+  String _stripInlineMarkers(String input) {
+    return input.replaceAll('**', '').replaceAll('__', '').trim();
+  }
+
+  Widget _buildRichLine(String line) {
+    final spans = <TextSpan>[];
+    final regex = RegExp(r'\*\*(.+?)\*\*|\*(.+?)\*');
+    int lastEnd = 0;
+
+    for (final match in regex.allMatches(line)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(text: line.substring(lastEnd, match.start)));
+      }
+      if (match.group(1) != null) {
+        spans.add(
+          TextSpan(
+            text: match.group(1),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: isDark
+                  ? AppColors.darkTextPrimary
+                  : AppColors.lightTextPrimary,
+            ),
+          ),
+        );
+      } else if (match.group(2) != null) {
+        spans.add(
+          TextSpan(
+            text: match.group(2),
+            style: const TextStyle(fontStyle: FontStyle.italic),
+          ),
+        );
+      }
+      lastEnd = match.end;
+    }
+
+    if (lastEnd < line.length) {
+      spans.add(TextSpan(text: line.substring(lastEnd)));
+    }
+
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: 13.5,
+          height: 1.5,
+          color: isDark
+              ? AppColors.darkTextSecondary
+              : const Color(0xFF334155),
+        ),
+        children: spans,
       ),
     );
   }
