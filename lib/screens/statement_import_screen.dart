@@ -21,16 +21,20 @@ class StatementImportScreen extends StatefulWidget {
 class _StatementImportScreenState extends State<StatementImportScreen> {
   static const _uuid = Uuid();
 
-  bool _importToCard = false;
+  ImportTargetMode _targetMode = ImportTargetMode.checking;
   bool _invertSigns = false;
   bool _isAiCategorizing = false;
   bool _aiCategorizedSuccess = false;
   String? _selectedAccountId;
+  String? _selectedCounterpartAccountId;
   String? _selectedCardId;
+  String? _selectedGoalId;
   List<ImportedTransactionCandidate> _candidates = [];
   String? _loadedFileName;
   String? _rawContent;
   String _rawExtension = 'csv';
+
+  bool get _importToCard => _targetMode == ImportTargetMode.creditCard;
 
   @override
   void initState() {
@@ -38,9 +42,15 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
     final state = widget.appState;
     if (state.accounts.isNotEmpty) {
       _selectedAccountId = state.accounts.first.id;
+      final other = state.accounts.where((a) => a.id != _selectedAccountId);
+      _selectedCounterpartAccountId =
+          other.isNotEmpty ? other.first.id : state.accounts.first.id;
     }
     if (state.creditCards.isNotEmpty) {
       _selectedCardId = state.creditCards.first.id;
+    }
+    if (state.goals.isNotEmpty) {
+      _selectedGoalId = state.goals.first.id;
     }
   }
 
@@ -82,6 +92,11 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
       extension: ext,
       categories: widget.appState.categories,
       existingTransactions: widget.appState.transactions,
+      goals: widget.appState.goals,
+      accounts: widget.appState.accounts,
+      defaultGoalId: _selectedGoalId,
+      sourceAccountId: _selectedAccountId,
+      defaultCounterpartAccountId: _selectedCounterpartAccountId,
       forceExpenseForCreditCard: _importToCard,
       invertSigns: _invertSigns,
     );
@@ -92,8 +107,10 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
       _aiCategorizedSuccess = false;
     });
 
-    // Dispara categorização automática por IA caso haja chave configurada
-    _runAiCategorization(silentIfNoKey: true);
+    if (_targetMode == ImportTargetMode.checking ||
+        _targetMode == ImportTargetMode.creditCard) {
+      _runAiCategorization(silentIfNoKey: true);
+    }
   }
 
   Future<void> _runAiCategorization({bool silentIfNoKey = false}) async {
@@ -154,12 +171,33 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
         existingTransactions: widget.appState.transactions,
       );
     });
-    _runAiCategorization(silentIfNoKey: true);
+    if (_targetMode == ImportTargetMode.checking ||
+        _targetMode == ImportTargetMode.creditCard) {
+      _runAiCategorization(silentIfNoKey: true);
+    }
   }
 
   void _toggleSingleCandidateType(ImportedTransactionCandidate c) {
     HapticFeedback.selectionClick();
     setState(() {
+      if (_targetMode == ImportTargetMode.transfer) {
+        c.isOutgoingTransfer = !c.isOutgoingTransfer;
+        return;
+      }
+      if (_targetMode == ImportTargetMode.cofrinho) {
+        switch (c.cofrinhoOp) {
+          case CofrinhoOperationKind.deposit:
+            c.cofrinhoOp = CofrinhoOperationKind.withdraw;
+            break;
+          case CofrinhoOperationKind.withdraw:
+            c.cofrinhoOp = CofrinhoOperationKind.yieldGain;
+            break;
+          case CofrinhoOperationKind.yieldGain:
+            c.cofrinhoOp = CofrinhoOperationKind.deposit;
+            break;
+        }
+        return;
+      }
       c.type = c.type == TransactionType.expense
           ? TransactionType.income
           : TransactionType.expense;
@@ -185,8 +223,127 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
     await widget.appState.saveCreditCard(card);
     setState(() {
       _selectedCardId = card.id;
-      _importToCard = true;
+      _targetMode = ImportTargetMode.creditCard;
     });
+  }
+
+  Future<void> _showQuickCreateGoalDialog() async {
+    final nameCtrl = TextEditingController();
+    final targetCtrl = TextEditingController(text: '10.000,00');
+    final created = await showDialog<GoalModel>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Novo Cofrinho / Caixinha'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Nome do Cofrinho (ex: Reserva Mercado Pago)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: targetCtrl,
+              keyboardType: TextInputType.number,
+              inputFormatters: const [CentavosCurrencyFormatter()],
+              decoration: const InputDecoration(
+                labelText: 'Meta do Cofrinho (R\$)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = nameCtrl.text.trim().isEmpty
+                  ? 'Cofrinho Mercado Pago'
+                  : nameCtrl.text.trim();
+              final target = CentavosCurrencyFormatter.parseValue(
+                targetCtrl.text,
+              );
+              final goal = GoalModel(
+                id: _uuid.v4(),
+                name: name,
+                targetAmount: target > 0 ? target : 10000.0,
+                currentAmount: 0.0,
+                colorValue: 0xFF059669,
+                iconName: 'savings',
+              );
+              Navigator.of(ctx).pop(goal);
+            },
+            child: const Text('Criar Cofrinho'),
+          ),
+        ],
+      ),
+    );
+
+    if (created != null) {
+      await widget.appState.saveGoal(created);
+      setState(() {
+        _selectedGoalId = created.id;
+        for (final c in _candidates) {
+          c.targetGoalId ??= created.id;
+        }
+      });
+    }
+  }
+
+  Future<void> _showQuickCreateAccountDialog() async {
+    final nameCtrl = TextEditingController();
+    final created = await showDialog<Account>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nova Conta Bancária'),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Nome do Banco / Conta (ex: Nubank, Mercado Pago)',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = nameCtrl.text.trim().isEmpty
+                  ? 'Nova Conta'
+                  : nameCtrl.text.trim();
+              final acc = Account(
+                id: _uuid.v4(),
+                name: name,
+                type: AccountType.checking,
+                initialBalance: 0.0,
+                currentBalance: 0.0,
+                colorValue: 0xFF059669,
+                iconName: 'account_balance',
+              );
+              Navigator.of(ctx).pop(acc);
+            },
+            child: const Text('Criar Conta'),
+          ),
+        ],
+      ),
+    );
+
+    if (created != null) {
+      await widget.appState.saveAccount(created);
+      setState(() {
+        _selectedCounterpartAccountId = created.id;
+        for (final c in _candidates) {
+          c.counterpartAccountId = created.id;
+        }
+      });
+    }
   }
 
   Future<void> _confirmImport() async {
@@ -203,26 +360,113 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
       card = state.getCardById(_selectedCardId);
     }
 
+    if (_targetMode == ImportTargetMode.cofrinho && state.goals.isEmpty) {
+      final defaultGoal = GoalModel(
+        id: _uuid.v4(),
+        name: 'Cofrinho Principal',
+        targetAmount: 10000.0,
+        currentAmount: 0.0,
+        colorValue: 0xFF059669,
+        iconName: 'savings',
+      );
+      await state.saveGoal(defaultGoal);
+      _selectedGoalId = defaultGoal.id;
+    }
+
     for (final item in selected) {
       final compMonth = card != null
           ? card.computeCompetenceMonth(item.date)
           : '${item.date.year}-${item.date.month.toString().padLeft(2, '0')}';
 
-      final tx = TransactionModel(
-        id: _uuid.v4(),
-        title: item.title,
-        amount: item.amount,
-        type: item.type,
-        date: item.date,
-        competenceMonth: compMonth,
-        status:
-            _importToCard ? TransactionStatus.pending : TransactionStatus.paid,
-        accountId: _importToCard ? null : _selectedAccountId,
-        cardId: _importToCard ? _selectedCardId : null,
-        categoryId: item.suggestedCategoryId,
-        importHash: item.importHash,
-      );
-      await state.addOrUpdateTransaction(tx);
+      if (_targetMode == ImportTargetMode.cofrinho) {
+        final goalId = item.targetGoalId ??
+            _selectedGoalId ??
+            (state.goals.isNotEmpty ? state.goals.first.id : null);
+
+        late final TransactionType txType;
+        late final String? txAccountId;
+        late final String? txCategoryId;
+        late final List<String> txTags;
+
+        switch (item.cofrinhoOp) {
+          case CofrinhoOperationKind.deposit:
+            // Aporte: tira da Conta Corrente e soma no Cofrinho
+            txType = TransactionType.expense;
+            txAccountId = _selectedAccountId;
+            txCategoryId = 'cat_aportes';
+            txTags = const ['cofrinho_aporte'];
+            break;
+          case CofrinhoOperationKind.withdraw:
+            // Resgate: devolve para a Conta Corrente e subtrai do Cofrinho
+            txType = TransactionType.income;
+            txAccountId = _selectedAccountId;
+            txCategoryId = 'cat_outras_receitas';
+            txTags = const ['resgate_cofrinho'];
+            break;
+          case CofrinhoOperationKind.yieldGain:
+            // Rendimento: soma apenas no saldo do Cofrinho (accountId = null para não inflar a Conta Corrente)
+            txType = TransactionType.income;
+            txAccountId = null;
+            txCategoryId = 'cat_rendimentos';
+            txTags = const ['rendimento_cofrinho'];
+            break;
+        }
+
+        final tx = TransactionModel(
+          id: _uuid.v4(),
+          title: item.title,
+          amount: item.amount,
+          type: txType,
+          date: item.date,
+          competenceMonth: compMonth,
+          status: TransactionStatus.paid,
+          accountId: txAccountId,
+          categoryId: txCategoryId,
+          goalId: goalId,
+          tags: txTags,
+          importHash: item.importHash,
+        );
+        await state.addOrUpdateTransaction(tx);
+      } else if (_targetMode == ImportTargetMode.transfer) {
+        final otherAccId = item.counterpartAccountId ??
+            _selectedCounterpartAccountId ??
+            _selectedAccountId;
+        final sourceAccId =
+            item.isOutgoingTransfer ? _selectedAccountId : otherAccId;
+        final destAccId =
+            item.isOutgoingTransfer ? otherAccId : _selectedAccountId;
+
+        final tx = TransactionModel(
+          id: _uuid.v4(),
+          title: item.title,
+          amount: item.amount,
+          type: TransactionType.transfer,
+          date: item.date,
+          competenceMonth: compMonth,
+          status: TransactionStatus.paid,
+          accountId: sourceAccId,
+          destinationAccountId: destAccId,
+          importHash: item.importHash,
+        );
+        await state.addOrUpdateTransaction(tx);
+      } else {
+        final tx = TransactionModel(
+          id: _uuid.v4(),
+          title: item.title,
+          amount: item.amount,
+          type: item.type,
+          date: item.date,
+          competenceMonth: compMonth,
+          status: _importToCard
+              ? TransactionStatus.pending
+              : TransactionStatus.paid,
+          accountId: _importToCard ? null : _selectedAccountId,
+          cardId: _importToCard ? _selectedCardId : null,
+          categoryId: item.suggestedCategoryId,
+          importHash: item.importHash,
+        );
+        await state.addOrUpdateTransaction(tx);
+      }
     }
 
     if (mounted) {
@@ -271,7 +515,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '1. Destino dos Lançamentos',
+                        '1. O que você está importando?',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -282,10 +526,14 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                         children: [
                           Expanded(
                             child: ChoiceChip(
-                              label: const Text('Conta Bancária'),
-                              selected: !_importToCard,
+                              label: const Text('Conta Corrente'),
+                              selected:
+                                  _targetMode == ImportTargetMode.checking,
                               onSelected: (_) {
-                                setState(() => _importToCard = false);
+                                setState(
+                                  () =>
+                                      _targetMode = ImportTargetMode.checking,
+                                );
                                 if (_rawContent != null &&
                                     _loadedFileName != null) {
                                   _parseContent(
@@ -297,13 +545,17 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                               },
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: ChoiceChip(
                               label: const Text('Fatura de Cartão'),
-                              selected: _importToCard,
+                              selected:
+                                  _targetMode == ImportTargetMode.creditCard,
                               onSelected: (_) {
-                                setState(() => _importToCard = true);
+                                setState(
+                                  () => _targetMode =
+                                      ImportTargetMode.creditCard,
+                                );
                                 if (_rawContent != null &&
                                     _loadedFileName != null) {
                                   _parseContent(
@@ -317,8 +569,56 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      if (_importToCard)
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Text('Cofrinho / Caixinha'),
+                              selected:
+                                  _targetMode == ImportTargetMode.cofrinho,
+                              onSelected: (_) {
+                                setState(
+                                  () =>
+                                      _targetMode = ImportTargetMode.cofrinho,
+                                );
+                                if (_rawContent != null &&
+                                    _loadedFileName != null) {
+                                  _parseContent(
+                                    _rawContent!,
+                                    _rawExtension,
+                                    _loadedFileName!,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Text('Transferência'),
+                              selected:
+                                  _targetMode == ImportTargetMode.transfer,
+                              onSelected: (_) {
+                                setState(
+                                  () =>
+                                      _targetMode = ImportTargetMode.transfer,
+                                );
+                                if (_rawContent != null &&
+                                    _loadedFileName != null) {
+                                  _parseContent(
+                                    _rawContent!,
+                                    _rawExtension,
+                                    _loadedFileName!,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      if (_targetMode == ImportTargetMode.creditCard)
                         if (state.creditCards.isNotEmpty)
                           DropdownButtonFormField<String>(
                             initialValue: _selectedCardId ??
@@ -376,7 +676,138 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                               ],
                             ),
                           )
-                      else
+                      else if (_targetMode == ImportTargetMode.cofrinho) ...[
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedAccountId,
+                          decoration: const InputDecoration(
+                            labelText:
+                                'Conta Corrente Vinculada (Aportes/Resgates)',
+                            isDense: true,
+                          ),
+                          items: state.accounts
+                              .map(
+                                (a) => DropdownMenuItem(
+                                  value: a.id,
+                                  child: Text(a.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _selectedAccountId = v),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: state.goals.isNotEmpty
+                                  ? DropdownButtonFormField<String>(
+                                      initialValue: state.goals.any(
+                                        (g) => g.id == _selectedGoalId,
+                                      )
+                                          ? _selectedGoalId
+                                          : state.goals.first.id,
+                                      decoration: const InputDecoration(
+                                        labelText:
+                                            'Cofrinho / Caixinha Padrão',
+                                        isDense: true,
+                                      ),
+                                      items: state.goals
+                                          .map(
+                                            (g) => DropdownMenuItem(
+                                              value: g.id,
+                                              child: Text(g.name),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (v) {
+                                        setState(() {
+                                          _selectedGoalId = v;
+                                          for (final c in _candidates) {
+                                            c.targetGoalId = v;
+                                          }
+                                        });
+                                      },
+                                    )
+                                  : const Text(
+                                      'Nenhum Cofrinho cadastrado.',
+                                      style: TextStyle(fontSize: 13),
+                                    ),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
+                              onPressed: _showQuickCreateGoalDialog,
+                              icon: const Icon(
+                                Icons.add_circle_outline_rounded,
+                                size: 18,
+                              ),
+                              label: const Text('+ Cofrinho'),
+                            ),
+                          ],
+                        ),
+                      ] else if (_targetMode == ImportTargetMode.transfer) ...[
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedAccountId,
+                          decoration: const InputDecoration(
+                            labelText: 'Conta do Extrato',
+                            isDense: true,
+                          ),
+                          items: state.accounts
+                              .map(
+                                (a) => DropdownMenuItem(
+                                  value: a.id,
+                                  child: Text(a.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _selectedAccountId = v),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: state.accounts.any(
+                                  (a) => a.id == _selectedCounterpartAccountId,
+                                )
+                                    ? _selectedCounterpartAccountId
+                                    : (state.accounts.isNotEmpty
+                                        ? state.accounts.first.id
+                                        : null),
+                                decoration: const InputDecoration(
+                                  labelText: 'Outra Conta Padrão',
+                                  isDense: true,
+                                ),
+                                items: state.accounts
+                                    .map(
+                                      (a) => DropdownMenuItem(
+                                        value: a.id,
+                                        child: Text(a.name),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) {
+                                  setState(() {
+                                    _selectedCounterpartAccountId = v;
+                                    for (final c in _candidates) {
+                                      c.counterpartAccountId = v;
+                                    }
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
+                              onPressed: _showQuickCreateAccountDialog,
+                              icon: const Icon(
+                                Icons.add_circle_outline_rounded,
+                                size: 18,
+                              ),
+                              label: const Text('+ Conta'),
+                            ),
+                          ],
+                        ),
+                      ] else
                         DropdownButtonFormField<String>(
                           initialValue: _selectedAccountId,
                           decoration: const InputDecoration(
@@ -493,42 +924,44 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                       Wrap(
                         spacing: 4,
                         children: [
-                          TextButton.icon(
-                            onPressed: _isAiCategorizing
-                                ? null
-                                : () => _runAiCategorization(
-                                      silentIfNoKey: false,
+                          if (_targetMode == ImportTargetMode.checking ||
+                              _targetMode == ImportTargetMode.creditCard)
+                            TextButton.icon(
+                              onPressed: _isAiCategorizing
+                                  ? null
+                                  : () => _runAiCategorization(
+                                        silentIfNoKey: false,
+                                      ),
+                              icon: _isAiCategorizing
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.auto_awesome_rounded,
+                                      size: 16,
+                                      color: _aiCategorizedSuccess
+                                          ? AppColors.emerald
+                                          : AppColors.indigoPrimary,
                                     ),
-                            icon: _isAiCategorizing
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Icon(
-                                    Icons.auto_awesome_rounded,
-                                    size: 16,
-                                    color: _aiCategorizedSuccess
-                                        ? AppColors.emerald
-                                        : AppColors.indigoPrimary,
-                                  ),
-                            label: Text(
-                              _isAiCategorizing
-                                  ? 'IA Categorizando...'
-                                  : (_aiCategorizedSuccess
-                                      ? 'Categorizado c/ IA'
-                                      : 'Categorizar c/ IA'),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: _aiCategorizedSuccess
-                                    ? AppColors.emerald
-                                    : AppColors.indigoPrimary,
+                              label: Text(
+                                _isAiCategorizing
+                                    ? 'IA Categorizando...'
+                                    : (_aiCategorizedSuccess
+                                        ? 'Categorizado c/ IA'
+                                        : 'Categorizar c/ IA'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: _aiCategorizedSuccess
+                                      ? AppColors.emerald
+                                      : AppColors.indigoPrimary,
+                                ),
                               ),
                             ),
-                          ),
                           TextButton.icon(
                             onPressed: _handleInvertAll,
                             icon: const Icon(Icons.swap_vert_rounded, size: 17),
@@ -556,6 +989,40 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                   )
                 else
                   ..._candidates.map((c) {
+                    late final Color badgeColor;
+                    late final String badgeText;
+
+                    if (_targetMode == ImportTargetMode.cofrinho) {
+                      switch (c.cofrinhoOp) {
+                        case CofrinhoOperationKind.deposit:
+                          badgeColor = AppColors.indigoPrimary;
+                          badgeText = 'Aporte (+ Cofrinho) ⇄';
+                          break;
+                        case CofrinhoOperationKind.withdraw:
+                          badgeColor = AppColors.amber;
+                          badgeText = 'Resgate (- Cofrinho) ⇄';
+                          break;
+                        case CofrinhoOperationKind.yieldGain:
+                          badgeColor = AppColors.emerald;
+                          badgeText = 'Rendimento (+ Cofrinho) ⇄';
+                          break;
+                      }
+                    } else if (_targetMode == ImportTargetMode.transfer) {
+                      badgeColor = c.isOutgoingTransfer
+                          ? AppColors.rose
+                          : AppColors.emerald;
+                      badgeText = c.isOutgoingTransfer
+                          ? 'Saída ➔ Outra Conta ⇄'
+                          : 'Entrada ⬅ Outra Conta ⇄';
+                    } else {
+                      badgeColor = c.type == TransactionType.income
+                          ? AppColors.emerald
+                          : AppColors.rose;
+                      badgeText = c.type == TransactionType.income
+                          ? 'Receita ⇄'
+                          : 'Despesa ⇄';
+                    }
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: Padding(
@@ -610,10 +1077,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                                           AppFormatters.currency(c.amount),
                                           style: TextStyle(
                                             fontWeight: FontWeight.w700,
-                                            color: c.type ==
-                                                    TransactionType.income
-                                                ? AppColors.emerald
-                                                : AppColors.rose,
+                                            color: badgeColor,
                                           ),
                                         ),
                                         Container(
@@ -622,25 +1086,18 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: (c.type ==
-                                                        TransactionType.income
-                                                    ? AppColors.emerald
-                                                    : AppColors.rose)
-                                                .withValues(alpha: 0.12),
+                                            color: badgeColor.withValues(
+                                              alpha: 0.12,
+                                            ),
                                             borderRadius:
                                                 BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            c.type == TransactionType.income
-                                                ? 'Receita ⇄'
-                                                : 'Despesa ⇄',
+                                            badgeText,
                                             style: TextStyle(
                                               fontSize: 10.5,
                                               fontWeight: FontWeight.w700,
-                                              color: c.type ==
-                                                      TransactionType.income
-                                                  ? AppColors.emerald
-                                                  : AppColors.rose,
+                                              color: badgeColor,
                                             ),
                                           ),
                                         ),
@@ -662,28 +1119,96 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
                                   ),
                                 ),
                               ),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 12),
-                              child: DropdownButton<String>(
-                                value: c.suggestedCategoryId,
-                                isExpanded: true,
-                                isDense: true,
-                                items: state.categories
-                                    .where((cat) => cat.type == c.type)
-                                    .map(
-                                      (cat) => DropdownMenuItem(
-                                        value: cat.id,
-                                        child: Text(
-                                          cat.name,
-                                          style: const TextStyle(fontSize: 13),
+                            if (_targetMode == ImportTargetMode.cofrinho &&
+                                state.goals.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: DropdownButton<String>(
+                                  value: state.goals.any(
+                                    (g) => g.id == c.targetGoalId,
+                                  )
+                                      ? c.targetGoalId
+                                      : (_selectedGoalId ??
+                                          state.goals.first.id),
+                                  isExpanded: true,
+                                  isDense: true,
+                                  items: state.goals
+                                      .map(
+                                        (g) => DropdownMenuItem(
+                                          value: g.id,
+                                          child: Text(
+                                            'Cofrinho: ${g.name}',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.indigoPrimary,
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (v) =>
-                                    setState(() => c.suggestedCategoryId = v),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => c.targetGoalId = v),
+                                ),
+                              )
+                            else if (_targetMode == ImportTargetMode.transfer &&
+                                state.accounts.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: DropdownButton<String>(
+                                  value: state.accounts.any(
+                                    (a) => a.id == c.counterpartAccountId,
+                                  )
+                                      ? c.counterpartAccountId
+                                      : (_selectedCounterpartAccountId ??
+                                          state.accounts.first.id),
+                                  isExpanded: true,
+                                  isDense: true,
+                                  items: state.accounts
+                                      .map(
+                                        (a) => DropdownMenuItem(
+                                          value: a.id,
+                                          child: Text(
+                                            c.isOutgoingTransfer
+                                                ? 'Para Conta: ${a.name}'
+                                                : 'Vindo da Conta: ${a.name}',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) => setState(
+                                    () => c.counterpartAccountId = v,
+                                  ),
+                                ),
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: DropdownButton<String>(
+                                  value: c.suggestedCategoryId,
+                                  isExpanded: true,
+                                  isDense: true,
+                                  items: state.categories
+                                      .where((cat) => cat.type == c.type)
+                                      .map(
+                                        (cat) => DropdownMenuItem(
+                                          value: cat.id,
+                                          child: Text(
+                                            cat.name,
+                                            style:
+                                                const TextStyle(fontSize: 13),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => c.suggestedCategoryId = v),
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),

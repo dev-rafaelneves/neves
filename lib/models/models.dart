@@ -664,6 +664,25 @@ class GoalModel {
       );
 }
 
+enum ImportTargetMode {
+  checking('Conta Corrente'),
+  creditCard('Fatura de Cartão'),
+  cofrinho('Cofrinho / Caixinha'),
+  transfer('Transferência');
+
+  final String label;
+  const ImportTargetMode(this.label);
+}
+
+enum CofrinhoOperationKind {
+  deposit('Aporte (- Conta / + Cofrinho)'),
+  withdraw('Resgate (+ Conta / - Cofrinho)'),
+  yieldGain('Rendimento (+ Cofrinho)');
+
+  final String label;
+  const CofrinhoOperationKind(this.label);
+}
+
 class ImportedTransactionCandidate {
   final String title;
   final double amount;
@@ -671,6 +690,10 @@ class ImportedTransactionCandidate {
   TransactionType type;
   final String importHash;
   String? suggestedCategoryId;
+  CofrinhoOperationKind cofrinhoOp;
+  String? targetGoalId;
+  String? counterpartAccountId;
+  bool isOutgoingTransfer;
   bool selected;
   bool isDuplicate;
 
@@ -681,6 +704,10 @@ class ImportedTransactionCandidate {
     required this.type,
     required this.importHash,
     this.suggestedCategoryId,
+    this.cofrinhoOp = CofrinhoOperationKind.deposit,
+    this.targetGoalId,
+    this.counterpartAccountId,
+    this.isOutgoingTransfer = true,
     this.selected = true,
     this.isDuplicate = false,
   });

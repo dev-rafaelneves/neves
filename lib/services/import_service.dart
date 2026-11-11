@@ -27,6 +27,11 @@ class ImportService {
     required String extension,
     required List<CategoryModel> categories,
     required List<TransactionModel> existingTransactions,
+    List<GoalModel> goals = const [],
+    List<Account> accounts = const [],
+    String? defaultGoalId,
+    String? sourceAccountId,
+    String? defaultCounterpartAccountId,
     bool forceExpenseForCreditCard = false,
     bool invertSigns = false,
   }) {
@@ -64,9 +69,86 @@ class ImportService {
         categories: categories,
         existingTransactions: existingTransactions,
       );
+      candidate.cofrinhoOp = detectCofrinhoOp(
+        title: candidate.title,
+        isExpenseBySign: candidate.type == TransactionType.expense,
+      );
+      candidate.targetGoalId = matchGoalIdByTitle(
+            title: candidate.title,
+            goals: goals,
+          ) ??
+          defaultGoalId ??
+          (goals.isNotEmpty ? goals.first.id : null);
+      candidate.isOutgoingTransfer = candidate.type == TransactionType.expense;
+      candidate.counterpartAccountId = matchCounterpartAccountByTitle(
+            title: candidate.title,
+            accounts: accounts,
+            sourceAccountId: sourceAccountId,
+          ) ??
+          defaultCounterpartAccountId;
     }
 
     return rawCandidates;
+  }
+
+  static CofrinhoOperationKind detectCofrinhoOp({
+    required String title,
+    required bool isExpenseBySign,
+  }) {
+    final lower = title.toLowerCase();
+    if (lower.contains('rendimento') ||
+        lower.contains('rendimentos') ||
+        lower.contains('cdi') ||
+        lower.contains('juros')) {
+      return CofrinhoOperationKind.yieldGain;
+    }
+    if (lower.contains('resgate') ||
+        lower.contains('retirado') ||
+        lower.contains('retirada')) {
+      return CofrinhoOperationKind.withdraw;
+    }
+    if (lower.contains('aporte') ||
+        lower.contains('guardado') ||
+        lower.contains('aplicação') ||
+        lower.contains('aplicacao') ||
+        lower.contains('depósito') ||
+        lower.contains('deposito')) {
+      return CofrinhoOperationKind.deposit;
+    }
+    return isExpenseBySign
+        ? CofrinhoOperationKind.deposit
+        : CofrinhoOperationKind.withdraw;
+  }
+
+  static String? matchGoalIdByTitle({
+    required String title,
+    required List<GoalModel> goals,
+  }) {
+    if (goals.isEmpty) return null;
+    final lower = title.toLowerCase();
+    for (final g in goals) {
+      final gName = g.name.trim().toLowerCase();
+      if (gName.isNotEmpty && lower.contains(gName)) {
+        return g.id;
+      }
+    }
+    return null;
+  }
+
+  static String? matchCounterpartAccountByTitle({
+    required String title,
+    required List<Account> accounts,
+    String? sourceAccountId,
+  }) {
+    final lower = title.toLowerCase();
+    for (final a in accounts) {
+      if (a.id == sourceAccountId) continue;
+      final aName = a.name.trim().toLowerCase();
+      if (aName.isNotEmpty && lower.contains(aName)) {
+        return a.id;
+      }
+    }
+    return null;
   }
 
   /// Inverte Receita <-> Despesa de todos os candidatos e recalcula a sugestão de categoria
@@ -79,6 +161,12 @@ class ImportService {
       c.type = c.type == TransactionType.expense
           ? TransactionType.income
           : TransactionType.expense;
+      c.isOutgoingTransfer = !c.isOutgoingTransfer;
+      if (c.cofrinhoOp == CofrinhoOperationKind.deposit) {
+        c.cofrinhoOp = CofrinhoOperationKind.withdraw;
+      } else if (c.cofrinhoOp == CofrinhoOperationKind.withdraw) {
+        c.cofrinhoOp = CofrinhoOperationKind.deposit;
+      }
       c.suggestedCategoryId = suggestCategory(
         title: c.title,
         type: c.type,

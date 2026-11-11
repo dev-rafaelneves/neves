@@ -894,13 +894,25 @@ class AppState extends ChangeNotifier {
     for (int i = 0; i < _goals.length; i++) {
       final g = _goals[i];
       double sum = 0.0;
+      bool hasLinkedTx = false;
       for (final t in _transactions) {
         if (t.goalId == g.id && t.status == TransactionStatus.paid) {
-          sum += t.amount;
+          hasLinkedTx = true;
+          final isWithdrawal = t.tags.contains('resgate_cofrinho') ||
+              (t.type == TransactionType.income &&
+                  t.categoryId != 'cat_rendimentos' &&
+                  !t.tags.contains('rendimento_cofrinho'));
+          if (isWithdrawal) {
+            sum -= t.amount;
+          } else {
+            sum += t.amount;
+          }
         }
       }
-      if (sum > 0) {
-        final updated = g.copyWith(currentAmount: sum);
+      if (hasLinkedTx) {
+        final updated = g.copyWith(
+          currentAmount: sum.clamp(0.0, double.infinity),
+        );
         _goals[i] = updated;
         await DatabaseService.saveGoal(updated);
       }
@@ -1037,11 +1049,15 @@ class AppState extends ChangeNotifier {
         .fold(0.0, (s, c) => s + getCardUsedLimit(c.id));
   }
 
+  double get goalsTotalBalance {
+    return _goals.fold(0.0, (s, g) => s + g.currentAmount);
+  }
+
   double get netWorth {
     final assets = _accounts
         .where((a) => !a.archived && a.includeInNetWorth)
         .fold(0.0, (s, a) => s + a.currentBalance);
-    return assets - totalCreditCardUnpaidDebt;
+    return assets + goalsTotalBalance - totalCreditCardUnpaidDebt;
   }
 
   /// Saldo Projetado no Fim do Mês = Saldo Atual em Contas Líquidas + Receitas Pendentes do Mês - Despesas Pendentes do Mês - Faturas de Cartão do Mês não pagas
