@@ -190,9 +190,6 @@ class GeminiService {
     required double totalExpense,
     required double projectedEndBalance,
     required double netWorth,
-    required double essentialSpent,
-    required double lifestyleSpent,
-    required double futureSaved,
     required Map<String, double> categoryBreakdown,
     required double futureInstallmentsTotal,
     bool forceRefresh = false,
@@ -202,6 +199,7 @@ class GeminiService {
       // Ignora cache antigo caso tenha sido salvo cortado (< 220 chars) ou com fragmentos em inglês
       if (cached != null &&
           cached.trim().length >= 220 &&
+          !cached.contains('50/30/20') &&
           !cached.contains('The Paradox') &&
           !cached.contains('Step 3:')) {
         return cached;
@@ -244,16 +242,11 @@ RESUMO DO MÊS ($yearMonth):
 - Patrimônio Líquido Consolidado (Net Worth): R\$ ${netWorth.toStringAsFixed(2)}
 - Comprometimento com Parcelas Futuras de Cartão: R\$ ${futureInstallmentsTotal.toStringAsFixed(2)}
 
-DISTRIBUIÇÃO 50 / 30 / 20:
-- Essenciais (Meta 50%): R\$ ${essentialSpent.toStringAsFixed(2)}
-- Estilo de Vida (Meta 30%): R\$ ${lifestyleSpent.toStringAsFixed(2)}
-- Futuro & Reserva (Meta 20%): R\$ ${futureSaved.toStringAsFixed(2)}
-
 DESPESAS POR CATEGORIA:
 ${catLines.isEmpty ? '- Sem despesas registradas neste mês.' : catLines}
 
 DIRETRIZES DA RESPOSTA:
-1. **Diagnóstico de Fluxo de Caixa e Regra 50/30/20**: Avalie o equilíbrio entre receitas e despesas e aponte se algum pilar da regra 50/30/20 está desajustado.
+1. **Diagnóstico de Fluxo de Caixa**: Avalie o equilíbrio entre receitas e despesas do mês, com base nas categorias de gasto.
 2. **Maiores Vilões e Cartão de Crédito**: Identifique as categorias que mais pesaram no orçamento e comente sobre o nível de parcelas futuras no cartão.
 3. **Plano de Ação Prático (3 Passos)**: Sugira 3 ações concretas e realistas para otimizar a taxa de poupança e acelerar as metas financeiras no próximo mês.
 4. Formate em Markdown limpo com subtítulos curtos, bullet points e entre 220 e 350 palavras. Entregue o texto completo até a conclusão.

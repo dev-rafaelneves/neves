@@ -4,13 +4,23 @@ import 'package:intl/intl.dart';
 import '../../models/models.dart';
 import '../../services/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/ignore_transaction_action.dart';
 import '../../widgets/month_selector_bar.dart';
 import '../transaction_form_sheet.dart';
 
 class TransactionsTab extends StatefulWidget {
   final AppState appState;
 
-  const TransactionsTab({super.key, required this.appState});
+  /// Quando definido, o extrato mostra apenas compras e pagamentos desse cartão.
+  final String? cardFilterId;
+  final VoidCallback? onClearCardFilter;
+
+  const TransactionsTab({
+    super.key,
+    required this.appState,
+    this.cardFilterId,
+    this.onClearCardFilter,
+  });
 
   @override
   State<TransactionsTab> createState() => _TransactionsTabState();
@@ -28,7 +38,11 @@ class _TransactionsTabState extends State<TransactionsTab> {
     final ym = state.selectedYearMonth;
     final discreet = state.discreetMode;
 
-    var list = state.transactionsForMonth(ym);
+    var list = state.transactionsForMonth(ym, includeIgnored: true);
+    final filterCard = state.getCardById(widget.cardFilterId);
+    if (filterCard != null) {
+      list = list.where((t) => t.cardId == filterCard.id).toList();
+    }
     if (_searchQuery.trim().isNotEmpty) {
       final q = _searchQuery.trim().toLowerCase();
       list = list
@@ -87,6 +101,35 @@ class _TransactionsTabState extends State<TransactionsTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (filterCard != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: filterCard.color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.credit_card_rounded, size: 18, color: filterCard.color),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Cartão ${filterCard.name}: compras e pagamentos',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: widget.onClearCardFilter,
+                              child: const Text('Limpar'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     // Campo de busca
                     TextField(
                       onChanged: (v) => setState(() => _searchQuery = v),
@@ -192,7 +235,9 @@ class _TransactionsTabState extends State<TransactionsTab> {
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
-                          child: Material(
+                          child: Opacity(
+                            opacity: tx.isIgnored ? 0.45 : 1.0,
+                            child: Material(
                             color:
                                 isDark ? AppColors.darkSurface : Colors.white,
                             shape: RoundedRectangleBorder(
@@ -247,9 +292,12 @@ class _TransactionsTabState extends State<TransactionsTab> {
                                                   maxLines: 1,
                                                   overflow:
                                                       TextOverflow.ellipsis,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontWeight: FontWeight.w700,
                                                     fontSize: 14.5,
+                                                    decoration: tx.isIgnored
+                                                        ? TextDecoration.lineThrough
+                                                        : null,
                                                   ),
                                                 ),
                                               ),
@@ -340,6 +388,35 @@ class _TransactionsTabState extends State<TransactionsTab> {
                                           ),
                                         ),
                                         const SizedBox(height: 4),
+                                        InkWell(
+                                          onTap: () {
+                                            HapticFeedback.selectionClick();
+                                            toggleIgnoreTransaction(context, state, tx);
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 4, top: 2),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  tx.isIgnored
+                                                      ? Icons.visibility_rounded
+                                                      : Icons.visibility_off_rounded,
+                                                  size: 13,
+                                                ),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  tx.isIgnored ? 'Reativar' : 'Ignorar',
+                                                  style: const TextStyle(
+                                                    fontSize: 10.5,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                         if (!tx.isCreditCard)
                                           InkWell(
                                             onTap: () {
@@ -377,6 +454,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
                                   ],
                                 ),
                               ),
+                            ),
                             ),
                           ),
                         );

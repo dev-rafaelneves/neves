@@ -355,7 +355,7 @@ class CategoryModel {
     required this.id,
     required this.name,
     required this.type,
-    required this.pillar,
+    this.pillar = Pillar503020.essential,
     required this.colorValue,
     required this.iconName,
     this.isSystem = false,
@@ -426,6 +426,7 @@ class TransactionModel {
   final String? notes;
   final String? importHash;
   final bool isInvoicePayment;
+  final bool isIgnored;
 
   const TransactionModel({
     required this.id,
@@ -448,6 +449,7 @@ class TransactionModel {
     this.notes,
     this.importHash,
     this.isInvoicePayment = false,
+    this.isIgnored = false,
   });
 
   bool get isCreditCard => cardId != null && cardId!.isNotEmpty;
@@ -483,6 +485,7 @@ class TransactionModel {
     String? notes,
     String? importHash,
     bool? isInvoicePayment,
+    bool? isIgnored,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -505,6 +508,7 @@ class TransactionModel {
       notes: notes ?? this.notes,
       importHash: importHash ?? this.importHash,
       isInvoicePayment: isInvoicePayment ?? this.isInvoicePayment,
+      isIgnored: isIgnored ?? this.isIgnored,
     );
   }
 
@@ -529,6 +533,7 @@ class TransactionModel {
         'notes': notes,
         'import_hash': importHash,
         'is_invoice_payment': isInvoicePayment ? 1 : 0,
+        'is_ignored': isIgnored ? 1 : 0,
       };
 
   factory TransactionModel.fromMap(Map<String, dynamic> m) {
@@ -565,6 +570,7 @@ class TransactionModel {
       notes: m['notes'] as String?,
       importHash: m['import_hash'] as String?,
       isInvoicePayment: (m['is_invoice_payment'] as num?) == 1,
+      isIgnored: (m['is_ignored'] as num?) == 1,
     );
   }
 }
@@ -696,6 +702,7 @@ class ImportedTransactionCandidate {
   bool isOutgoingTransfer;
   bool selected;
   bool isDuplicate;
+  bool ignored;
 
   ImportedTransactionCandidate({
     required this.title,
@@ -710,6 +717,7 @@ class ImportedTransactionCandidate {
     this.isOutgoingTransfer = true,
     this.selected = true,
     this.isDuplicate = false,
+    this.ignored = false,
   });
 }
 

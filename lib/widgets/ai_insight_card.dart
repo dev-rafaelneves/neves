@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/models.dart';
 import '../services/app_state.dart';
 import '../services/database_service.dart';
 import '../services/gemini_service.dart';
@@ -73,7 +72,6 @@ class _AiInsightCardState extends State<AiInsightCard> {
     try {
       final state = widget.appState;
       final ym = state.selectedYearMonth;
-      final pillars = state.pillar503020Breakdown(ym);
       final breakdown = <String, double>{};
       for (final e in state.categoryExpenseBreakdown(ym).entries) {
         breakdown[e.key.name] = e.value;
@@ -85,9 +83,6 @@ class _AiInsightCardState extends State<AiInsightCard> {
         totalExpense: state.totalExpenseForMonth(ym),
         projectedEndBalance: state.projectedEndOfMonthBalance(ym),
         netWorth: state.netWorth,
-        essentialSpent: pillars[Pillar503020.essential] ?? 0,
-        lifestyleSpent: pillars[Pillar503020.lifestyle] ?? 0,
-        futureSaved: pillars[Pillar503020.future] ?? 0,
         categoryBreakdown: breakdown,
         futureInstallmentsTotal: state.totalCreditCardUnpaidDebt,
         forceRefresh: forceRefresh,
@@ -163,7 +158,7 @@ class _AiInsightCardState extends State<AiInsightCard> {
                         ),
                       ),
                       Text(
-                        'Diagnóstico Gemini • Regra 50/30/20 & Faturas',
+                        'Diagnóstico Gemini • Categorias & Faturas',
                         style: TextStyle(
                           fontSize: 12,
                           color: isDark
@@ -271,7 +266,7 @@ class _AiInsightCardState extends State<AiInsightCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Gere um parecer personalizado do mês com análise da regra 50/30/20, alerta de parcelas futuras no cartão e 3 recomendações práticas de economia.',
+                    'Gere um parecer personalizado do mês com análise das categorias de gasto, alerta de parcelas futuras no cartão e 3 recomendações práticas de economia.',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.4,

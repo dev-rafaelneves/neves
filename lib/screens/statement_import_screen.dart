@@ -612,6 +612,7 @@ Regras obrigatórias:
           goalId: goalId,
           tags: txTags,
           importHash: item.importHash,
+          isIgnored: item.ignored,
         );
         await state.addOrUpdateTransaction(tx);
       } else if (_targetMode == ImportTargetMode.transfer) {
@@ -634,6 +635,7 @@ Regras obrigatórias:
           accountId: sourceAccId,
           destinationAccountId: destAccId,
           importHash: item.importHash,
+          isIgnored: item.ignored,
         );
         await state.addOrUpdateTransaction(tx);
       } else {
@@ -651,6 +653,7 @@ Regras obrigatórias:
           cardId: _importToCard ? _selectedCardId : null,
           categoryId: item.suggestedCategoryId,
           importHash: item.importHash,
+          isIgnored: item.ignored,
         );
         await state.addOrUpdateTransaction(tx);
       }
@@ -1144,20 +1147,55 @@ Regras obrigatórias:
 
               if (_loadedFileName != null) ...[
                 const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        'FONTE: ${_loadedFileName!.toUpperCase()} (${_candidates.length} ITENS)',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.6,
-                          color: AppColors.indigoPrimary,
+                    Row(
+                      children: [
+                        const Text(
+                          'FONTE',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: AppColors.indigoPrimary,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.indigoPrimary
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _loadedFileName!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.indigoPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_candidates.length} itens',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 6),
                     if (_candidates.isNotEmpty)
                       Wrap(
                         spacing: 4,
@@ -1261,7 +1299,9 @@ Regras obrigatórias:
                           : 'Despesa ⇄';
                     }
 
-                    return Card(
+                    return Opacity(
+                      opacity: c.ignored ? 0.5 : 1.0,
+                      child: Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
@@ -1344,6 +1384,34 @@ Regras obrigatórias:
                                   ),
                                 ),
                               ],
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: () =>
+                                    setState(() => c.ignored = !c.ignored),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  foregroundColor: c.ignored
+                                      ? AppColors.orange
+                                      : null,
+                                ),
+                                icon: Icon(
+                                  c.ignored
+                                      ? Icons.visibility_off_rounded
+                                      : Icons.visibility_outlined,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  c.ignored
+                                      ? 'Ignorada (não conta em nada)'
+                                      : 'Ignorar (não é minha)',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                             ),
                             if (c.isDuplicate)
                               const Padding(
@@ -1449,6 +1517,7 @@ Regras obrigatórias:
                               ),
                           ],
                         ),
+                      ),
                       ),
                     );
                   }),

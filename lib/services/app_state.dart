@@ -605,6 +605,7 @@ class AppState extends ChangeNotifier {
     double used = 0.0;
     for (final t in _transactions) {
       if (t.cardId == cardId &&
+          !t.isIgnored &&
           !t.isInvoicePayment &&
           t.status == TransactionStatus.pending) {
         used += t.amount;
@@ -628,6 +629,7 @@ class AppState extends ChangeNotifier {
           (t) =>
               t.cardId == cardId &&
               t.competenceMonth == yearMonth &&
+              !t.isIgnored &&
               !t.isInvoicePayment,
         )
         .toList();
@@ -837,6 +839,32 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Marca/desmarca uma transação como ignorada (fora de saldos, categorias,
+  /// insights, fatura e totais). Em parcelados, pode estender às parcelas futuras.
+  Future<void> setTransactionIgnored(
+    TransactionModel tx,
+    bool ignored, {
+    bool includeFutureInstallments = false,
+  }) async {
+    for (int i = 0; i < _transactions.length; i++) {
+      final t = _transactions[i];
+      final isSame = t.id == tx.id;
+      final isFuture = includeFutureInstallments &&
+          tx.installmentGroupId != null &&
+          t.installmentGroupId == tx.installmentGroupId &&
+          t.installmentIndex > tx.installmentIndex;
+      if (isSame || isFuture) {
+        final updated = t.copyWith(isIgnored: ignored);
+        _transactions[i] = updated;
+        await DatabaseService.saveTransaction(updated);
+      }
+    }
+    await _recalculateAccountBalances();
+    await _recalculateGoals();
+    await _persistFallbackIfNeeded();
+    notifyListeners();
+  }
+
   Future<void> toggleTransactionPaid(TransactionModel tx) async {
     final nextStatus = tx.status == TransactionStatus.paid
         ? TransactionStatus.pending
@@ -870,6 +898,7 @@ class AppState extends ChangeNotifier {
       double bal = acc.initialBalance;
 
       for (final t in _transactions) {
+        if (t.isIgnored) continue;
         if (t.status != TransactionStatus.paid) continue;
         if (t.isCreditCard && !t.isInvoicePayment) continue;
 
@@ -896,7 +925,9 @@ class AppState extends ChangeNotifier {
       double sum = 0.0;
       bool hasLinkedTx = false;
       for (final t in _transactions) {
-        if (t.goalId == g.id && t.status == TransactionStatus.paid) {
+        if (t.goalId == g.id &&
+            !t.isIgnored &&
+            t.status == TransactionStatus.paid) {
           hasLinkedTx = true;
           final isWithdrawal = t.tags.contains('resgate_cofrinho') ||
               (t.type == TransactionType.income &&
@@ -1006,9 +1037,15 @@ class AppState extends ChangeNotifier {
   }
 
   // --- Cálculos Financeiros do Mês e Patrimônio Líquido ---
-  List<TransactionModel> transactionsForMonth(String yearMonth) {
+  /// Transações do mês. Por padrão exclui as ignoradas (fora de totais, categorias e insights).
+  List<TransactionModel> transactionsForMonth(
+    String yearMonth, {
+    bool includeIgnored = false,
+  }) {
     return _transactions
-        .where((t) => t.effectiveMonth(_budgetRegime) == yearMonth)
+        .where((t) =>
+            t.effectiveMonth(_budgetRegime) == yearMonth &&
+            (includeIgnored || !t.isIgnored))
         .toList();
   }
 
@@ -1079,6 +1116,7 @@ class AppState extends ChangeNotifier {
     final unpaidCardInvoicesThisMonth = _transactions
         .where((t) =>
             t.isCreditCard &&
+            !t.isIgnored &&
             !t.isInvoicePayment &&
             t.competenceMonth == yearMonth &&
             t.status == TransactionStatus.pending)
@@ -1111,24 +1149,6 @@ class AppState extends ChangeNotifier {
     final sortedEntries = map.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     return Map.fromEntries(sortedEntries);
-  }
-
-  /// Calcula o realizado de cada pilar da Regra 50/30/20 no mês
-  Map<Pillar503020, double> pillar503020Breakdown(String yearMonth) {
-    final result = {
-      Pillar503020.essential: 0.0,
-      Pillar503020.lifestyle: 0.0,
-      Pillar503020.future: 0.0,
-    };
-
-    for (final t in transactionsForMonth(yearMonth)) {
-      if (t.type != TransactionType.expense || t.isInvoicePayment) continue;
-      final cat = getCategoryById(t.categoryId);
-      final pillar = cat?.pillar ?? Pillar503020.essential;
-      result[pillar] = (result[pillar] ?? 0.0) + t.amount;
-    }
-
-    return result;
   }
 
   List<String> get allUsedTags {

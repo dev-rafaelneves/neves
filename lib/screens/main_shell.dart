@@ -25,6 +25,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
+  String? _cardFilterId;
 
   @override
   Widget build(BuildContext context) {
@@ -57,8 +58,18 @@ class _MainShellState extends State<MainShell> {
         body: IndexedStack(
           index: _selectedIndex,
           children: [
-            DashboardTab(appState: widget.appState),
-            TransactionsTab(appState: widget.appState),
+            DashboardTab(
+              appState: widget.appState,
+              onOpenCardStatement: (card) => setState(() {
+                _cardFilterId = card.id;
+                _selectedIndex = 1;
+              }),
+            ),
+            TransactionsTab(
+              appState: widget.appState,
+              cardFilterId: _cardFilterId,
+              onClearCardFilter: () => setState(() => _cardFilterId = null),
+            ),
             PlanningTab(appState: widget.appState),
             SettingsTab(appState: widget.appState),
           ],

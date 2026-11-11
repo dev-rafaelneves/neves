@@ -52,6 +52,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
   late RecurrenceRule _recurrence;
 
   bool _useCreditCard = false;
+  bool _isIgnored = false;
   String? _selectedAccountId;
   String? _destinationAccountId;
   String? _selectedCardId;
@@ -79,6 +80,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
     _recurrence = tx?.recurrenceRule ?? RecurrenceRule.none;
 
     _useCreditCard = tx?.isCreditCard ?? false;
+    _isIgnored = tx?.isIgnored ?? false;
     _selectedAccountId = tx?.accountId ??
         (state.accounts.isNotEmpty ? state.accounts.first.id : null);
     _destinationAccountId = tx?.destinationAccountId ??
@@ -181,10 +183,6 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
                         ),
-                      ),
-                      subtitle: Text(
-                        cat.pillar.label,
-                        style: const TextStyle(fontSize: 12),
                       ),
                       trailing: selected
                           ? const Icon(
@@ -449,6 +447,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
           : (_useCreditCard ? _installments : 1),
       recurrenceRule: _recurrence,
       tags: _tags,
+      isIgnored: _isIgnored,
     );
 
     await state.addOrUpdateTransaction(
@@ -768,7 +767,6 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                               iconColor:
                                   selectedCat?.color ?? AppColors.indigoPrimary,
                               label: 'Categoria',
-                              subtitle: selectedCat?.pillar.label,
                               onTap: () => _pickCategory(filteredCategories),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -1097,6 +1095,18 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                               ),
                             ),
                           ],
+                          const Divider(indent: 62, height: 1),
+                          HigFormRow(
+                            icon: Icons.visibility_off_rounded,
+                            iconColor: AppColors.orange,
+                            label: 'Ignorar transação',
+                            subtitle:
+                                'Não conta em categorias, insights, saldos e totais',
+                            trailing: Switch.adaptive(
+                              value: _isIgnored,
+                              onChanged: (v) => setState(() => _isIgnored = v),
+                            ),
+                          ),
                           const Divider(indent: 62, height: 1),
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 8, 12, 10),

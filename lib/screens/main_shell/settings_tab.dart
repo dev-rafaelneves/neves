@@ -24,7 +24,6 @@ class _SettingsTabState extends State<SettingsTab> {
   Future<void> _showNewCategoryDialog() async {
     final nameCtrl = TextEditingController();
     TransactionType type = TransactionType.expense;
-    Pillar503020 pillar = Pillar503020.essential;
     int colorVal = 0xFF059669;
     final colors = [
       0xFF059669,
@@ -71,7 +70,7 @@ class _SettingsTabState extends State<SettingsTab> {
                   const SizedBox(height: 14),
                   const Center(
                     child: Text(
-                      'Nova Categoria (50/30/20)',
+                      'Nova Categoria',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
@@ -154,34 +153,6 @@ class _SettingsTabState extends State<SettingsTab> {
                       ),
                       const Divider(indent: 62, height: 1),
                       HigFormRow(
-                        icon: Icons.pie_chart_outline_rounded,
-                        iconColor: AppColors.emerald,
-                        label: 'Pilar 50/30/20',
-                        trailing: DropdownButton<Pillar503020>(
-                          value: pillar,
-                          underline: const SizedBox.shrink(),
-                          items: Pillar503020.values
-                              .map(
-                                (p) => DropdownMenuItem(
-                                  value: p,
-                                  child: Text(
-                                    p.label,
-                                    style: const TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.indigoPrimary,
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) setModalState(() => pillar = v);
-                          },
-                        ),
-                      ),
-                      const Divider(indent: 62, height: 1),
-                      HigFormRow(
                         icon: Icons.palette_outlined,
                         iconColor: Color(colorVal),
                         label: 'Cor do Ícone',
@@ -220,7 +191,6 @@ class _SettingsTabState extends State<SettingsTab> {
                             id: _uuid.v4(),
                             name: name,
                             type: type,
-                            pillar: pillar,
                             colorValue: colorVal,
                             iconName: 'shopping_bag',
                           ),
@@ -384,7 +354,7 @@ class _SettingsTabState extends State<SettingsTab> {
                     ),
                     const SizedBox(height: 18),
 
-                    // 2. Categorias 50/30/20
+                    // 2. Categorias
                     Material(
                       color: isDark ? AppColors.darkSurface : Colors.white,
                       shape: RoundedRectangleBorder(
@@ -402,7 +372,7 @@ class _SettingsTabState extends State<SettingsTab> {
                           color: AppColors.indigoPrimary,
                         ),
                         title: const Text(
-                          'Criar Nova Categoria (50/30/20)',
+                          'Criar Nova Categoria',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 15.5,

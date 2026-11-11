@@ -15,7 +15,14 @@ import '../statement_import_screen.dart';
 class DashboardTab extends StatefulWidget {
   final AppState appState;
 
-  const DashboardTab({super.key, required this.appState});
+  /// Chamado ao pedir o extrato filtrado de um cartão (aba Cartões).
+  final ValueChanged<CreditCardModel>? onOpenCardStatement;
+
+  const DashboardTab({
+    super.key,
+    required this.appState,
+    this.onOpenCardStatement,
+  });
 
   @override
   State<DashboardTab> createState() => _DashboardTabState();
@@ -1810,6 +1817,19 @@ class _DashboardTabState extends State<DashboardTab> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              widget.onOpenCardStatement?.call(card),
+                          icon: const Icon(
+                            Icons.receipt_long_rounded,
+                            size: 16,
+                          ),
+                          label: const Text('Ver Extrato do Cartão'),
+                        ),
                       ),
                     ],
                   ),

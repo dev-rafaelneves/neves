@@ -115,9 +115,18 @@ class DatabaseService {
         tags_json TEXT NOT NULL DEFAULT '[]',
         notes TEXT,
         import_hash TEXT,
-        is_invoice_payment INTEGER NOT NULL DEFAULT 0
+        is_invoice_payment INTEGER NOT NULL DEFAULT 0,
+        is_ignored INTEGER NOT NULL DEFAULT 0
       )
     ''');
+
+    // Migração: adiciona is_ignored em bancos já existentes.
+    final txCols = await db.rawQuery('PRAGMA table_info(transactions)');
+    if (!txCols.any((c) => c['name'] == 'is_ignored')) {
+      await db.execute(
+        'ALTER TABLE transactions ADD COLUMN is_ignored INTEGER NOT NULL DEFAULT 0',
+      );
+    }
 
     await db.execute('''
       CREATE TABLE IF NOT EXISTS budgets (

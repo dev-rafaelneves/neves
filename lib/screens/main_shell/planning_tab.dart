@@ -19,7 +19,7 @@ class PlanningTab extends StatefulWidget {
 
 class _PlanningTabState extends State<PlanningTab> {
   static const _uuid = Uuid();
-  int _selectedSegment = 0; // 0: Teto Categorias, 1: Regra 50/30/20, 2: Caixinhas
+  int _selectedSegment = 0; // 0: Teto Categorias, 1: Caixinhas
 
   Future<void> _showSetBudgetDialog(CategoryModel category) async {
     final state = widget.appState;
@@ -70,7 +70,7 @@ class _PlanningTabState extends State<PlanningTab> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Competência $ym • ${category.pillar.label}',
+                'Competência $ym',
                 style: TextStyle(
                   fontSize: 12.5,
                   color: isDark
@@ -475,16 +475,6 @@ class _PlanningTabState extends State<PlanningTab> {
                           1: Padding(
                             padding: EdgeInsets.symmetric(vertical: 8),
                             child: Text(
-                              'Regra 50/30/20',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          2: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
                               'Caixinhas',
                               style: TextStyle(
                                 fontSize: 12.5,
@@ -503,8 +493,7 @@ class _PlanningTabState extends State<PlanningTab> {
                     ),
                     const SizedBox(height: 16),
                     if (_selectedSegment == 0) _buildCategoryBudgets(context),
-                    if (_selectedSegment == 1) _build503020Section(context),
-                    if (_selectedSegment == 2) _buildGoalsSection(context),
+                    if (_selectedSegment == 1) _buildGoalsSection(context),
                   ],
                 ),
               ),
@@ -592,15 +581,6 @@ class _PlanningTabState extends State<PlanningTab> {
                                     fontSize: 14.5,
                                   ),
                                 ),
-                                Text(
-                                  cat.pillar.label,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: isDark
-                                        ? AppColors.darkTextSecondary
-                                        : AppColors.lightTextSecondary,
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -651,126 +631,6 @@ class _PlanningTabState extends State<PlanningTab> {
             ),
           );
         }),
-      ],
-    );
-  }
-
-  Widget _build503020Section(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final state = widget.appState;
-    final ym = state.selectedYearMonth;
-    final discreet = state.discreetMode;
-
-    final income = state.totalIncomeForMonth(ym);
-    final pillars = state.pillar503020Breakdown(ym);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Material(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(
-              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Equilíbrio Financeiro 50 / 30 / 20',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Baseado na sua renda do mês de ${AppFormatters.currency(income, discreet: discreet)}, veja quanto cada pilar está consumindo:',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                for (final pillar in Pillar503020.values) ...[
-                  Builder(
-                    builder: (context) {
-                      final spent = pillars[pillar] ?? 0.0;
-                      final ideal = income * pillar.targetRatio;
-                      final actualPct =
-                          income > 0 ? (spent / income * 100) : 0.0;
-                      final targetPct = (pillar.targetRatio * 100).round();
-                      final isOver =
-                          pillar != Pillar503020.future && spent > ideal && ideal > 0;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  pillar.label,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                Text(
-                                  '${AppFormatters.currency(spent, discreet: discreet)} (${actualPct.toStringAsFixed(0)}% / Meta $targetPct%)',
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: isOver
-                                        ? AppColors.rose
-                                        : AppColors.emerald,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: LinearProgressIndicator(
-                                value: ideal > 0
-                                    ? (spent / ideal).clamp(0.0, 1.0)
-                                    : 0.0,
-                                minHeight: 8,
-                                backgroundColor: isDark
-                                    ? AppColors.darkBorder
-                                    : const Color(0xFFE2E8F0),
-                                color: isOver
-                                    ? AppColors.rose
-                                    : (pillar == Pillar503020.future
-                                        ? AppColors.emerald
-                                        : AppColors.indigoPrimary),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Teto ideal sugerido: ${AppFormatters.currency(ideal, discreet: discreet)}',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: isDark
-                                    ? AppColors.darkTextSecondary
-                                    : AppColors.lightTextSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
       ],
     );
   }
