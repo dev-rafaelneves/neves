@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#E2E8F0" />
+    </linearGradient>
+    <linearGradient id="walletGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#047857" flood-opacity="0.28" />
+    </filter>
+  </defs>
+
+  <!-- App Icon Background (Squircle Apple HIG) -->
+  <rect x="32" y="32" width="448" height="448" rx="100" ry="100" fill="url(#bgGrad)" />
+
+  <!-- Wallet / Card Body -->
+  <rect x="116" y="116" width="280" height="280" rx="56" ry="56" fill="url(#walletGrad)" filter="url(#shadow)" />
+
+  <!-- Top Card Accent Strip -->
+  <rect x="152" y="150" width="208" height="36" rx="14" fill="#A7F3D0" opacity="0.45" />
+
+  <!-- Financial Display Screen -->
+  <rect x="172" y="212" width="168" height="76" rx="22" fill="#FFFFFF" opacity="0.96" />
+
+  <!-- Currency Symbol R$ -->
+  <text x="256" y="264" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="800" fill="#047857" text-anchor="middle" letter-spacing="-1">R$</text>
+
+  <!-- Bottom Growth Bars -->
+  <rect x="180" y="326" width="36" height="34" rx="10" fill="#FFFFFF" opacity="0.32" />
+  <rect x="238" y="314" width="36" height="46" rx="10" fill="#FFFFFF" opacity="0.55" />
+  <rect x="296" y="300" width="36" height="60" rx="10" fill="#FFFFFF" opacity="0.88" />
+</svg>
