@@ -21,118 +21,219 @@ class AppLockGate extends StatefulWidget {
     AppState appState,
   ) async {
     final pinCtrl = TextEditingController();
+    final confirmPinCtrl = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    String? errorMsg;
 
     await showDialog<void>(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            appState.hasPinLock
-                ? 'Alterar ou Desativar PIN'
-                : 'Configurar PIN de 4 Dígitos',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Proteja seu patrimônio, cartões e extratos com uma senha criptografada de 4 números (SHA-256) ao abrir o aplicativo.',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.lightTextSecondary,
-                ),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: pinCtrl,
-                keyboardType: TextInputType.number,
-                maxLength: 4,
-                obscureText: true,
-                textAlign: TextAlign.center,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 10,
-                ),
-                decoration: InputDecoration(
-                  hintText: '••••',
-                  counterText: '',
-                  filled: true,
-                  fillColor: isDark
-                      ? AppColors.darkBackground
-                      : const Color(0xFFF1F5F9),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
+              title: Text(
+                appState.hasPinLock
+                    ? 'Alterar ou Desativar PIN'
+                    : 'Configurar PIN de 4 Dígitos',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-            ],
-          ),
-          actions: [
-            if (appState.hasPinLock)
-              TextButton(
-                onPressed: () async {
-                  await appState.setAppPin(null);
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Bloqueio por PIN desativado.'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Proteja seu patrimônio, cartões e extratos com uma senha criptografada de 4 números (SHA-256) ao abrir o aplicativo.',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
                       ),
-                    );
-                  }
-                },
-                child: const Text(
-                  'Desativar PIN',
-                  style: TextStyle(color: AppColors.rose),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Novo PIN',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: pinCtrl,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      obscureText: true,
+                      textAlign: TextAlign.center,
+                      onChanged: (_) {
+                        if (errorMsg != null) {
+                          setDialogState(() => errorMsg = null);
+                        }
+                      },
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 10,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '••••',
+                        counterText: '',
+                        filled: true,
+                        fillColor: isDark
+                            ? AppColors.darkBackground
+                            : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Confirme o PIN',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: confirmPinCtrl,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      obscureText: true,
+                      textAlign: TextAlign.center,
+                      onChanged: (_) {
+                        if (errorMsg != null) {
+                          setDialogState(() => errorMsg = null);
+                        }
+                      },
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 10,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '••••',
+                        counterText: '',
+                        filled: true,
+                        fillColor: isDark
+                            ? AppColors.darkBackground
+                            : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    if (errorMsg != null) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline_rounded,
+                            size: 16,
+                            color: AppColors.danger(context),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              errorMsg!,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.danger(context),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final text = pinCtrl.text.trim();
-                if (text.length != 4) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Digite exatamente 4 números.'),
+              actions: [
+                if (appState.hasPinLock)
+                  TextButton(
+                    onPressed: () async {
+                      await appState.setAppPin(null);
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Bloqueio por PIN desativado.'),
+                          ),
+                        );
+                      }
+                    },
+                    child: Text(
+                      'Desativar PIN',
+                      style: TextStyle(color: AppColors.danger(context)),
                     ),
-                  );
-                  return;
-                }
-                await appState.setAppPin(text);
-                if (ctx.mounted) Navigator.of(ctx).pop();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('PIN de segurança ativado com sucesso!'),
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-              ),
-              child: const Text('Salvar PIN'),
-            ),
-          ],
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final text = pinCtrl.text.trim();
+                    final confirmText = confirmPinCtrl.text.trim();
+                    if (text.length != 4) {
+                      HapticFeedback.heavyImpact();
+                      setDialogState(
+                        () => errorMsg = 'Digite exatamente 4 números.',
+                      );
+                      return;
+                    }
+                    if (text != confirmText) {
+                      HapticFeedback.heavyImpact();
+                      setDialogState(
+                        () => errorMsg =
+                            'Os dois PINs não coincidem. Confira e tente novamente.',
+                      );
+                      return;
+                    }
+                    await appState.setAppPin(text);
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('PIN de segurança ativado com sucesso!'),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                  ),
+                  child: const Text('Salvar PIN'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+
+    pinCtrl.dispose();
+    confirmPinCtrl.dispose();
   }
 
   @override
@@ -286,7 +387,24 @@ class _AppLockGateState extends State<AppLockGate>
       return Scaffold(
         backgroundColor:
             isDark ? AppColors.darkBackground : AppColors.lightBackground,
-        body: SafeArea(
+        body: Focus(
+          autofocus: true,
+          onKeyEvent: (node, event) {
+            if (event is! KeyDownEvent) return KeyEventResult.ignored;
+            final key = event.logicalKey;
+            if (key == LogicalKeyboardKey.backspace ||
+                key == LogicalKeyboardKey.delete) {
+              _onBackspace();
+              return KeyEventResult.handled;
+            }
+            final ch = event.character;
+            if (ch != null && ch.length == 1 && RegExp(r'^[0-9]$').hasMatch(ch)) {
+              _onDigitTap(ch);
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -376,27 +494,32 @@ class _AppLockGateState extends State<AppLockGate>
                               onTap: () => _onDigitTap(d),
                             ),
                           if (widget.appState.useBiometrics)
-                            Material(
-                              color:
-                                  isDark ? AppColors.darkSurface : Colors.white,
-                              shape: CircleBorder(
-                                side: BorderSide(
-                                  color: isDark
-                                      ? AppColors.darkBorder
-                                      : AppColors.lightBorder,
+                            Semantics(
+                              button: true,
+                              label: 'Desbloquear com biometria',
+                              child: Material(
+                                color: isDark
+                                    ? AppColors.darkSurface
+                                    : Colors.white,
+                                shape: CircleBorder(
+                                  side: BorderSide(
+                                    color: isDark
+                                        ? AppColors.darkBorder
+                                        : AppColors.lightBorder,
+                                  ),
                                 ),
-                              ),
-                              child: InkWell(
-                                onTap: isLockedOut ? null : _tryBiometrics,
-                                customBorder: const CircleBorder(),
-                                child: const SizedBox(
-                                  width: 68,
-                                  height: 68,
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.fingerprint_rounded,
-                                      size: 32,
-                                      color: AppColors.primary,
+                                child: InkWell(
+                                  onTap: isLockedOut ? null : _tryBiometrics,
+                                  customBorder: const CircleBorder(),
+                                  child: const SizedBox(
+                                    width: 68,
+                                    height: 68,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.fingerprint_rounded,
+                                        size: 32,
+                                        color: AppColors.primary,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -412,9 +535,14 @@ class _AppLockGateState extends State<AppLockGate>
                           SizedBox(
                             width: 68,
                             height: 68,
-                            child: IconButton(
-                              onPressed: isLockedOut ? null : _onBackspace,
-                              icon: const Icon(Icons.backspace_outlined),
+                            child: Semantics(
+                              button: true,
+                              label: 'Apagar dígito',
+                              child: IconButton(
+                                tooltip: 'Apagar dígito',
+                                onPressed: isLockedOut ? null : _onBackspace,
+                                icon: const Icon(Icons.backspace_outlined),
+                              ),
                             ),
                           ),
                         ],
@@ -425,6 +553,7 @@ class _AppLockGateState extends State<AppLockGate>
               ),
             ),
           ),
+        ),
         ),
       );
     }

@@ -37,6 +37,24 @@ class _TransactionsTabState extends State<TransactionsTab> {
   String _activeFilter = 'all'; // all | expense | income | pending | card
   String? _selectedTag;
   final Set<String> _hiddenIds = {};
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _searchCtrl.clear();
+      _searchQuery = '';
+      _activeFilter = 'all';
+      _selectedTag = null;
+    });
+    widget.onClearCardFilter?.call();
+    widget.onClearCategoryFilter?.call();
+  }
 
   void _showUndoSnack(String message, Future<void> Function() onUndo) {
     final messenger = ScaffoldMessenger.of(context);
@@ -227,10 +245,21 @@ class _TransactionsTabState extends State<TransactionsTab> {
                     ],
                     // Campo de busca
                     TextField(
+                      controller: _searchCtrl,
                       onChanged: (v) => setState(() => _searchQuery = v),
                       decoration: InputDecoration(
                         hintText: 'Buscar por descrição ou #tag...',
                         prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                tooltip: 'Limpar busca',
+                                icon: const Icon(Icons.close_rounded, size: 18),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
                         isDense: true,
                         filled: true,
                         fillColor:
@@ -285,43 +314,107 @@ class _TransactionsTabState extends State<TransactionsTab> {
                     ),
                     const SizedBox(height: 14),
 
-                    if (list.isEmpty)
-                      Material(
-                        color: isDark ? AppColors.darkSurface : Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: BorderSide(
-                            color: isDark
-                                ? AppColors.darkBorder
-                                : AppColors.lightBorder,
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(28),
-                          child: Center(
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.receipt_long_rounded,
-                                  size: 40,
-                                  color: isDark
-                                      ? AppColors.darkTextSecondary
-                                      : AppColors.lightTextSecondary,
-                                ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  'Nenhum lançamento encontrado',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 15.5,
-                                  ),
-                                ),
-                              ],
+                    if (list.isEmpty) ...[
+                      Builder(
+                        builder: (context) {
+                          final hasFilters = filterCard != null ||
+                              filterCategory != null ||
+                              _searchQuery.trim().isNotEmpty ||
+                              _activeFilter != 'all' ||
+                              _selectedTag != null;
+                          return Material(
+                            color: isDark ? AppColors.darkSurface : Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: BorderSide(
+                                color: isDark
+                                    ? AppColors.darkBorder
+                                    : AppColors.lightBorder,
+                              ),
                             ),
-                          ),
-                        ),
-                      )
-                    else ...[
+                            child: Padding(
+                              padding: const EdgeInsets.all(28),
+                              child: Center(
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      hasFilters
+                                          ? Icons.filter_alt_off_rounded
+                                          : Icons.receipt_long_rounded,
+                                      size: 40,
+                                      color: isDark
+                                          ? AppColors.darkTextSecondary
+                                          : AppColors.lightTextSecondary,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      hasFilters
+                                          ? 'Nenhum lançamento encontrado com esses filtros'
+                                          : 'Nenhum lançamento em ${AppFormatters.monthLabel(ym)}',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      hasFilters
+                                          ? 'Tente outro termo ou limpe os filtros ativos.'
+                                          : 'Toque abaixo para registrar sua primeira despesa ou receita do mês.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: isDark
+                                            ? AppColors.darkTextSecondary
+                                            : AppColors.lightTextSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    if (hasFilters)
+                                      OutlinedButton.icon(
+                                        onPressed: _clearAllFilters,
+                                        icon: const Icon(
+                                          Icons.refresh_rounded,
+                                          size: 18,
+                                        ),
+                                        label: const Text('Limpar filtros'),
+                                      )
+                                    else
+                                      ElevatedButton.icon(
+                                        onPressed: () =>
+                                            TransactionFormSheet.show(
+                                          context,
+                                          appState: state,
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primary,
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        icon: const Icon(
+                                          Icons.add_rounded,
+                                          size: 18,
+                                        ),
+                                        label: const Text(
+                                          'Novo lançamento',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ] else ...[
                       _buildSummaryBar(
                         context,
                         list: list,

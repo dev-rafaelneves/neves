@@ -1,13 +1,13 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../services/app_state.dart';
 import '../services/gemini_service.dart';
 import '../services/import_service.dart';
 import '../theme/app_theme.dart';
+import 'statement_import/import_candidate_card.dart';
 
 class StatementImportScreen extends StatefulWidget {
   final AppState appState;
@@ -677,7 +677,16 @@ Regras obrigatórias:
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final state = widget.appState;
-    final selectedCount = _candidates.where((c) => c.selected).length;
+    final selectedCandidates = _candidates.where((c) => c.selected).toList();
+    final selectedCount = selectedCandidates.length;
+    final duplicateCount = _candidates.where((c) => c.isDuplicate).length;
+    final selectedIncome = selectedCandidates
+        .where((c) => !c.ignored && c.type == TransactionType.income)
+        .fold(0.0, (sum, c) => sum + c.amount);
+    final selectedExpense = selectedCandidates
+        .where((c) => !c.ignored && c.type == TransactionType.expense)
+        .fold(0.0, (sum, c) => sum + c.amount);
+    final maxWidth = MediaQuery.sizeOf(context).width >= 840 ? 720.0 : 520.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -695,7 +704,7 @@ Regras obrigatórias:
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
+          constraints: BoxConstraints(maxWidth: maxWidth),
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -1302,263 +1311,23 @@ Regras obrigatórias:
                     ),
                   )
                 else
-                  ..._candidates.map((c) {
-                    late final Color badgeColor;
-                    late final String badgeText;
-
-                    if (_targetMode == ImportTargetMode.cofrinho) {
-                      switch (c.cofrinhoOp) {
-                        case CofrinhoOperationKind.deposit:
-                          badgeColor = AppColors.primary;
-                          badgeText = 'Aporte (+ Caixinha) ⇄';
-                          break;
-                        case CofrinhoOperationKind.withdraw:
-                          badgeColor = AppColors.amber;
-                          badgeText = 'Resgate (- Caixinha) ⇄';
-                          break;
-                        case CofrinhoOperationKind.yieldGain:
-                          badgeColor = AppColors.emerald;
-                          badgeText = 'Rendimento (+ Caixinha) ⇄';
-                          break;
-                      }
-                    } else if (_targetMode == ImportTargetMode.transfer) {
-                      badgeColor = c.isOutgoingTransfer
-                          ? AppColors.rose
-                          : AppColors.emerald;
-                      badgeText = c.isOutgoingTransfer
-                          ? 'Saída ➔ Outra Conta ⇄'
-                          : 'Entrada ⬅ Outra Conta ⇄';
-                    } else {
-                      badgeColor = c.type == TransactionType.income
-                          ? AppColors.emerald
-                          : AppColors.rose;
-                      badgeText = c.type == TransactionType.income
-                          ? 'Receita ⇄'
-                          : 'Despesa ⇄';
-                    }
-
-                    return Opacity(
-                      opacity: c.ignored ? 0.5 : 1.0,
-                      child: Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Checkbox(
-                                  value: c.selected,
-                                  onChanged: (v) =>
-                                      setState(() => c.selected = v ?? false),
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        c.title,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      Text(
-                                        DateFormat('dd/MM/yyyy').format(c.date),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: isDark
-                                              ? AppColors.darkTextSecondary
-                                              : AppColors.lightTextSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () => _toggleSingleCandidateType(c),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 4,
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          AppFormatters.currency(c.amount),
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            color: badgeColor,
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: badgeColor.withValues(
-                                              alpha: 0.12,
-                                            ),
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            badgeText,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: badgeColor,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                onPressed: () =>
-                                    setState(() => c.ignored = !c.ignored),
-                                style: TextButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                  foregroundColor: c.ignored
-                                      ? AppColors.orange
-                                      : null,
-                                ),
-                                icon: Icon(
-                                  c.ignored
-                                      ? Icons.visibility_off_rounded
-                                      : Icons.visibility_outlined,
-                                  size: 16,
-                                ),
-                                label: Text(
-                                  c.ignored
-                                      ? 'Ignorada (não conta em nada)'
-                                      : 'Ignorar (não é minha)',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (c.isDuplicate)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 12, bottom: 4),
-                                child: Text(
-                                  '⚠️ Possível duplicata já existente no seu extrato (desmarcado automaticamente)',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.warning(context),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            if (_targetMode == ImportTargetMode.cofrinho &&
-                                state.goals.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 12),
-                                child: DropdownButton<String>(
-                                  value: state.goals.any(
-                                    (g) => g.id == c.targetGoalId,
-                                  )
-                                      ? c.targetGoalId
-                                      : (_selectedGoalId ??
-                                          state.goals.first.id),
-                                  isExpanded: true,
-                                  isDense: true,
-                                  items: state.goals
-                                      .map(
-                                        (g) => DropdownMenuItem(
-                                          value: g.id,
-                                          child: Text(
-                                            'Caixinha: ${g.name}',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.primary,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (v) =>
-                                      setState(() => c.targetGoalId = v),
-                                ),
-                              )
-                            else if (_targetMode == ImportTargetMode.transfer &&
-                                state.accounts.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 12),
-                                child: DropdownButton<String>(
-                                  value: state.accounts.any(
-                                    (a) => a.id == c.counterpartAccountId,
-                                  )
-                                      ? c.counterpartAccountId
-                                      : (_selectedCounterpartAccountId ??
-                                          state.accounts.first.id),
-                                  isExpanded: true,
-                                  isDense: true,
-                                  items: state.accounts
-                                      .map(
-                                        (a) => DropdownMenuItem(
-                                          value: a.id,
-                                          child: Text(
-                                            c.isOutgoingTransfer
-                                                ? 'Para Conta: ${a.name}'
-                                                : 'Vindo da Conta: ${a.name}',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (v) => setState(
-                                    () => c.counterpartAccountId = v,
-                                  ),
-                                ),
-                              )
-                            else
-                              Padding(
-                                padding: const EdgeInsets.only(left: 12),
-                                child: DropdownButton<String>(
-                                  value: c.suggestedCategoryId,
-                                  isExpanded: true,
-                                  isDense: true,
-                                  items: state.categories
-                                      .where((cat) => cat.type == c.type)
-                                      .map(
-                                        (cat) => DropdownMenuItem(
-                                          value: cat.id,
-                                          child: Text(
-                                            cat.name,
-                                            style:
-                                                const TextStyle(fontSize: 13),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (v) =>
-                                      setState(() => c.suggestedCategoryId = v),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      ),
-                    );
-                  }),
+                  ..._candidates.map(
+                    (c) => ImportCandidateCard(
+                      candidate: c,
+                      targetMode: _targetMode,
+                      accounts: state.accounts,
+                      categories: state.categories,
+                      goals: state.goals,
+                      selectedGoalId: _selectedGoalId,
+                      selectedCounterpartAccountId:
+                          _selectedCounterpartAccountId,
+                      onToggleSelected: (v) => setState(() => c.selected = v),
+                      onToggleType: () => _toggleSingleCandidateType(c),
+                      onToggleIgnored: () =>
+                          setState(() => c.ignored = !c.ignored),
+                      onChanged: () => setState(() {}),
+                    ),
+                  ),
               ],
             ],
           ),
@@ -1566,24 +1335,73 @@ Regras obrigatórias:
       ),
       bottomNavigationBar: selectedCount > 0
           ? SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: ElevatedButton.icon(
-                  onPressed: _confirmImport,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: const Icon(Icons.download_done_rounded),
-                  label: Text(
-                    'Importar $selectedCount Lançamentos Selecionados',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
+              child: Center(
+                heightFactor: 1.0,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 4,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            if (selectedIncome > 0)
+                              Text(
+                                'Entradas: +${AppFormatters.currency(selectedIncome)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.success(context),
+                                ),
+                              ),
+                            if (selectedExpense > 0)
+                              Text(
+                                'Saídas: -${AppFormatters.currency(selectedExpense)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.danger(context),
+                                ),
+                              ),
+                            if (duplicateCount > 0)
+                              Text(
+                                '$duplicateCount duplicata(s) detectada(s)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.warning(context),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _confirmImport,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: const Icon(Icons.download_done_rounded),
+                            label: Text(
+                              'Importar $selectedCount Lançamentos Selecionados',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

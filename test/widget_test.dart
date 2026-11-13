@@ -6,6 +6,7 @@ import 'package:neves/models/models.dart';
 import 'package:neves/services/app_state.dart';
 import 'package:neves/services/import_service.dart';
 import 'package:neves/theme/app_theme.dart';
+import 'package:neves/widgets/month_selector_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -186,8 +187,50 @@ date,category,title,amount
     await tester.pumpWidget(NevesFinanceApp(appState: appState));
     await tester.pumpAndSettle();
 
+    expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.text('Resumo'), findsOneWidget);
     expect(find.text('Contas'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'TransactionFormSheet exibe erro inline e MonthSelectorBar abre seletor de mês',
+      (tester) async {
+    final appState = AppState();
+    await appState.init();
+
+    await tester.pumpWidget(NevesFinanceApp(appState: appState));
+    await tester.pumpAndSettle();
+
+    // Avança um mês e abre o seletor rápido de mês tocando no rótulo central
+    final initialYm = appState.selectedYearMonth;
+    await tester.tap(find.byIcon(Icons.chevron_right_rounded).first);
+    await tester.pumpAndSettle();
+    expect(appState.selectedYearMonth, isNot(initialYm));
+
+    final pickerFinder = find.descendant(
+      of: find.byType(MonthSelectorBar),
+      matching: find.byType(Text),
+    );
+    await tester.tap(pickerFinder.first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ir para o mês atual'), findsOneWidget);
+    await tester.tap(find.text('Ir para o mês atual'));
+    await tester.pumpAndSettle();
+    expect(appState.selectedYearMonth, initialYm);
+
+    // Abre formulário pelo FAB e tenta salvar vazio -> erro inline visível na folha
+    await tester.tap(find.byKey(const ValueKey('fab_new_transaction')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Informe um valor maior que R\$ 0,00 e uma descrição.'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 }

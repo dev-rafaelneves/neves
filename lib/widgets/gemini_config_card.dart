@@ -66,6 +66,9 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      constraints: MediaQuery.sizeOf(context).width >= 840
+          ? const BoxConstraints(maxWidth: 600)
+          : null,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -189,7 +192,15 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
                               ? null
                               : () async {
                                   final key = controller.text.trim();
-                                  if (key.isEmpty) return;
+                                  if (key.isEmpty) {
+                                    HapticFeedback.heavyImpact();
+                                    setModalState(() {
+                                      dialogStatus =
+                                          'Cole sua chave API do Gemini antes de testar.';
+                                      isSuccess = false;
+                                    });
+                                    return;
+                                  }
                                   setModalState(() {
                                     testingInDialog = true;
                                     dialogStatus = 'Testando conexão...';
@@ -210,7 +221,15 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
                         child: ElevatedButton(
                           onPressed: () async {
                             final key = controller.text.trim();
-                            if (key.isEmpty) return;
+                            if (key.isEmpty) {
+                              HapticFeedback.heavyImpact();
+                              setModalState(() {
+                                dialogStatus =
+                                    'Informe uma chave API válida para salvar.';
+                                isSuccess = false;
+                              });
+                              return;
+                            }
                             await widget.appState.saveGeminiApiKey(key);
                             await _loadKey();
                             if (ctx.mounted) Navigator.of(ctx).pop();
@@ -231,6 +250,7 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
         );
       },
     );
+    controller.dispose();
   }
 
   @override

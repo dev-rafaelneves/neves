@@ -34,6 +34,9 @@ class _PlanningTabState extends State<PlanningTab> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      constraints: MediaQuery.sizeOf(context).width >= 840
+          ? const BoxConstraints(maxWidth: 600)
+          : null,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -137,14 +140,19 @@ class _PlanningTabState extends State<PlanningTab> {
       ),
     );
 
+    String? goalError;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      constraints: MediaQuery.sizeOf(context).width >= 840
+          ? const BoxConstraints(maxWidth: 600)
+          : null,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
-        return Container(
+        return StatefulBuilder(
+          builder: (context, setModalState) => Container(
           padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset + 24),
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
@@ -238,6 +246,11 @@ class _PlanningTabState extends State<PlanningTab> {
                           Expanded(
                             child: TextField(
                               controller: nameCtrl,
+                              onChanged: (_) {
+                                if (goalError != null) {
+                                  setModalState(() => goalError = null);
+                                }
+                              },
                               textCapitalization: TextCapitalization.words,
                               decoration: const InputDecoration(
                                 hintText:
@@ -278,13 +291,43 @@ class _PlanningTabState extends State<PlanningTab> {
                     ),
                   ],
                 ),
+                if (goalError != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline_rounded,
+                        size: 16,
+                        color: AppColors.danger(context),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          goalError!,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.danger(context),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 22),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () async {
                       final name = nameCtrl.text.trim();
-                      if (name.isEmpty) return;
+                      if (name.isEmpty) {
+                        HapticFeedback.heavyImpact();
+                        setModalState(
+                          () => goalError =
+                              'Informe um nome para identificar a Caixinha.',
+                        );
+                        return;
+                      }
                       final target = CentavosCurrencyFormatter.parseValue(
                         targetCtrl.text,
                       );
@@ -325,94 +368,208 @@ class _PlanningTabState extends State<PlanningTab> {
               ],
             ),
           ),
+        ),
         );
       },
     );
+    nameCtrl.dispose();
+    targetCtrl.dispose();
+    currentCtrl.dispose();
   }
 
   Future<void> _showQuickDepositDialog(GoalModel goal) async {
     final ctrl = TextEditingController(text: '0,00');
+    bool isWithdraw = false;
+    String? moveError;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      constraints: MediaQuery.sizeOf(context).width >= 840
+          ? const BoxConstraints(maxWidth: 600)
+          : null,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
-        return Container(
-          padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset + 24),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4.5,
-                  decoration: BoxDecoration(
+        return StatefulBuilder(
+          builder: (context, setModalState) => Container(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset + 24),
+            decoration: BoxDecoration(
+              color:
+                  isDark ? AppColors.darkBackground : AppColors.lightBackground,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4.5,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF475569)
+                          : const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  goal.name,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Saldo atual: ${AppFormatters.currency(goal.currentAmount)}',
+                  style: TextStyle(
+                    fontSize: 12.5,
                     color: isDark
-                        ? const Color(0xFF475569)
-                        : const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(100),
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Guardar em ${goal.name}',
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: CupertinoSlidingSegmentedControl<bool>(
+                    groupValue: isWithdraw,
+                    children: const {
+                      false: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Guardar (+)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      true: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Resgatar (-)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    },
+                    onValueChanged: (v) {
+                      if (v != null) {
+                        HapticFeedback.selectionClick();
+                        setModalState(() {
+                          isWithdraw = v;
+                          moveError = null;
+                        });
+                      }
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              HigCurrencyHeroField(
-                controller: ctrl,
-                label: 'Valor do Aporte',
-                accentColor: AppColors.success(context),
-                autofocus: true,
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final delta = CentavosCurrencyFormatter.parseValue(
-                      ctrl.text,
-                    );
-                    if (delta > 0) {
-                      await widget.appState.addContributionToGoal(goal, delta);
+                const SizedBox(height: 14),
+                HigCurrencyHeroField(
+                  controller: ctrl,
+                  label: isWithdraw ? 'Valor do Resgate' : 'Valor do Aporte',
+                  accentColor: isWithdraw
+                      ? AppColors.warning(context)
+                      : AppColors.success(context),
+                  autofocus: true,
+                  onChanged: (_) {
+                    if (moveError != null) {
+                      setModalState(() => moveError = null);
                     }
-                    if (ctx.mounted) Navigator.of(ctx).pop();
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.successStrong,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                ),
+                if (moveError != null) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline_rounded,
+                        size: 16,
+                        color: AppColors.danger(context),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          moveError!,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.danger(context),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  icon: const Icon(Icons.savings_rounded, size: 20),
-                  label: const Text(
-                    'Confirmar Aporte',
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w700,
+                ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final delta = CentavosCurrencyFormatter.parseValue(
+                        ctrl.text,
+                      );
+                      if (delta <= 0) {
+                        HapticFeedback.heavyImpact();
+                        setModalState(
+                          () => moveError = 'Informe um valor maior que R\$ 0,00.',
+                        );
+                        return;
+                      }
+                      if (isWithdraw && delta > goal.currentAmount) {
+                        HapticFeedback.heavyImpact();
+                        setModalState(
+                          () => moveError =
+                              'O resgate não pode exceder o saldo guardado (${AppFormatters.currency(goal.currentAmount)}).',
+                        );
+                        return;
+                      }
+                      await widget.appState.addContributionToGoal(
+                        goal,
+                        isWithdraw ? -delta : delta,
+                      );
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isWithdraw
+                          ? AppColors.warningStrong
+                          : AppColors.successStrong,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: Icon(
+                      isWithdraw
+                          ? Icons.output_rounded
+                          : Icons.savings_rounded,
+                      size: 20,
+                    ),
+                    label: Text(
+                      isWithdraw ? 'Confirmar Resgate' : 'Confirmar Aporte',
+                      style: const TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
+    ctrl.dispose();
   }
 
   @override
@@ -517,9 +674,113 @@ class _PlanningTabState extends State<PlanningTab> {
         .where((c) => c.type == TransactionType.expense)
         .toList();
 
+    final items = expenseCategories.map((cat) {
+      final spent = state.getCategorySpent(cat.id, ym);
+      final budget = state.getBudgetForCategory(cat.id, ym);
+      final limit = budget?.limitAmount ?? 0.0;
+      final ratio = limit > 0 ? (spent / limit) : 0.0;
+      return (cat: cat, spent: spent, limit: limit, ratio: ratio);
+    }).toList();
+
+    items.sort((a, b) {
+      final aHas = a.limit > 0;
+      final bHas = b.limit > 0;
+      if (aHas != bHas) return aHas ? -1 : 1;
+      if (aHas && bHas) return b.ratio.compareTo(a.ratio);
+      return b.spent.compareTo(a.spent);
+    });
+
+    final budgetedItems = items.where((e) => e.limit > 0).toList();
+    final totalBudgetedLimit =
+        budgetedItems.fold(0.0, (s, e) => s + e.limit);
+    final totalBudgetedSpent =
+        budgetedItems.fold(0.0, (s, e) => s + e.spent);
+    final alertCount = budgetedItems.where((e) => e.ratio >= 0.8).length;
+    final globalRatio = totalBudgetedLimit > 0
+        ? (totalBudgetedSpent / totalBudgetedLimit)
+        : 0.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (budgetedItems.isNotEmpty) ...[
+          Material(
+            color: isDark ? AppColors.darkSurface : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Saúde do Orçamento',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      if (alertCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning(context)
+                                .withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '$alertCount em alerta',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.warning(context),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${AppFormatters.currency(totalBudgetedSpent, discreet: discreet)} de ${AppFormatters.currency(totalBudgetedLimit, discreet: discreet)} nos ${budgetedItems.length} tetos definidos',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: globalRatio.clamp(0.0, 1.0),
+                      minHeight: 7,
+                      backgroundColor: isDark
+                          ? AppColors.darkBorder
+                          : const Color(0xFFE2E8F0),
+                      color: globalRatio >= 1.0
+                          ? AppColors.rose
+                          : (globalRatio >= 0.8
+                              ? AppColors.orange
+                              : AppColors.emerald),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         Text(
           'Toque em qualquer categoria para definir um teto mensal de gastos. Você receberá alertas em 80% e 100%.',
           style: TextStyle(
@@ -530,11 +791,11 @@ class _PlanningTabState extends State<PlanningTab> {
           ),
         ),
         const SizedBox(height: 12),
-        ...expenseCategories.map((cat) {
-          final spent = state.getCategorySpent(cat.id, ym);
-          final budget = state.getBudgetForCategory(cat.id, ym);
-          final limit = budget?.limitAmount ?? 0.0;
-          final ratio = limit > 0 ? (spent / limit) : 0.0;
+        ...items.map((item) {
+          final cat = item.cat;
+          final spent = item.spent;
+          final limit = item.limit;
+          final ratio = item.ratio;
 
           Color barColor = AppColors.emerald;
           if (ratio >= 1.0) {
@@ -665,7 +926,77 @@ class _PlanningTabState extends State<PlanningTab> {
             ),
           ],
         ),
-        ...state.goals.map((goal) {
+        if (state.goals.isEmpty)
+          Material(
+            color: isDark ? AppColors.darkSurface : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.emerald.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        Icons.savings_outlined,
+                        size: 26,
+                        color: AppColors.success(context),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Nenhuma Caixinha criada ainda',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Separe sua reserva de emergência, viagens ou objetivos com metas de saldo e acompanhamento visual.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => _showGoalModal(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text(
+                        'Criar primeira Caixinha',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          ...state.goals.map((goal) {
           final pct = (goal.progress * 100).toStringAsFixed(0);
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),

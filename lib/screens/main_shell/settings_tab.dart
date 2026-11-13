@@ -25,6 +25,8 @@ class _SettingsTabState extends State<SettingsTab> {
     final nameCtrl = TextEditingController();
     TransactionType type = TransactionType.expense;
     int colorVal = 0xFF059669;
+    String iconName = 'shopping_bag';
+    String? errorMsg;
     final colors = [
       0xFF059669,
       0xFF10B981,
@@ -33,10 +35,25 @@ class _SettingsTabState extends State<SettingsTab> {
       0xFF0D9488,
       0xFF06B6D4,
     ];
+    const iconOptions = [
+      'shopping_bag',
+      'shopping_cart',
+      'restaurant',
+      'directions_car',
+      'home',
+      'favorite',
+      'pets',
+      'flight',
+      'sports_esports',
+      'work',
+    ];
 
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      constraints: MediaQuery.sizeOf(context).width >= 840
+          ? const BoxConstraints(maxWidth: 600)
+          : null,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -96,7 +113,7 @@ class _SettingsTabState extends State<SettingsTab> {
                                 borderRadius: BorderRadius.circular(9),
                               ),
                               child: Icon(
-                                Icons.category_rounded,
+                                AppIconsCatalog.fromName(iconName),
                                 color: Color(colorVal),
                                 size: 19,
                               ),
@@ -105,6 +122,11 @@ class _SettingsTabState extends State<SettingsTab> {
                             Expanded(
                               child: TextField(
                                 controller: nameCtrl,
+                                onChanged: (_) {
+                                  if (errorMsg != null) {
+                                    setModalState(() => errorMsg = null);
+                                  }
+                                },
                                 textCapitalization: TextCapitalization.words,
                                 decoration: const InputDecoration(
                                   hintText:
@@ -177,22 +199,112 @@ class _SettingsTabState extends State<SettingsTab> {
                           }).toList(),
                         ),
                       ),
+                      const Divider(indent: 62, height: 1),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ícone',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w500,
+                                color: isDark
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.lightTextSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: iconOptions.map((key) {
+                                final selected = iconName == key;
+                                return InkWell(
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: () =>
+                                      setModalState(() => iconName = key),
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? Color(colorVal)
+                                              .withValues(alpha: 0.16)
+                                          : (isDark
+                                              ? AppColors.darkBackground
+                                              : const Color(0xFFF1F5F9)),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: selected
+                                          ? Border.all(
+                                              color: Color(colorVal),
+                                              width: 1.5,
+                                            )
+                                          : null,
+                                    ),
+                                    child: Icon(
+                                      AppIconsCatalog.fromName(key),
+                                      size: 18,
+                                      color: selected
+                                          ? Color(colorVal)
+                                          : (isDark
+                                              ? AppColors.darkTextSecondary
+                                              : AppColors.lightTextSecondary),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
+                  if (errorMsg != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline_rounded,
+                          size: 16,
+                          color: AppColors.danger(context),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            errorMsg!,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.danger(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         final name = nameCtrl.text.trim();
-                        if (name.isEmpty) return;
+                        if (name.isEmpty) {
+                          HapticFeedback.heavyImpact();
+                          setModalState(
+                            () => errorMsg =
+                                'Informe um nome para a nova categoria.',
+                          );
+                          return;
+                        }
                         await widget.appState.saveCategory(
                           CategoryModel(
                             id: _uuid.v4(),
                             name: name,
                             type: type,
                             colorValue: colorVal,
-                            iconName: 'shopping_bag',
+                            iconName: iconName,
                           ),
                         );
                         if (ctx.mounted) Navigator.of(ctx).pop();
@@ -223,6 +335,7 @@ class _SettingsTabState extends State<SettingsTab> {
         );
       },
     );
+    nameCtrl.dispose();
   }
 
   @override
@@ -234,16 +347,17 @@ class _SettingsTabState extends State<SettingsTab> {
       slivers: [
         SliverAppBar(
           pinned: true,
+          toolbarHeight: 68,
           backgroundColor: isDark
-              ? AppColors.darkBackground.withValues(alpha: 0.9)
-              : AppColors.lightBackground.withValues(alpha: 0.9),
+              ? AppColors.darkBackground.withValues(alpha: 0.92)
+              : AppColors.lightBackground.withValues(alpha: 0.92),
           centerTitle: false,
           titleSpacing: 20,
           title: Text(
             'Ajustes',
             style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
               letterSpacing: -0.6,
               color: isDark
                   ? AppColors.darkTextPrimary
@@ -325,7 +439,7 @@ class _SettingsTabState extends State<SettingsTab> {
                                   BudgetRegime.competence: Padding(
                                     padding: EdgeInsets.symmetric(vertical: 8),
                                     child: Text(
-                                      'Competência da Fatura',
+                                      'Por Fatura',
                                       style: TextStyle(
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.w600,
@@ -335,7 +449,7 @@ class _SettingsTabState extends State<SettingsTab> {
                                   BudgetRegime.purchaseDate: Padding(
                                     padding: EdgeInsets.symmetric(vertical: 8),
                                     child: Text(
-                                      'Data da Compra',
+                                      'Por Data da Compra',
                                       style: TextStyle(
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.w600,

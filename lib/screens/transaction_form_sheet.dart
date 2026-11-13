@@ -28,6 +28,9 @@ class TransactionFormSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      constraints: MediaQuery.sizeOf(context).width >= 840
+          ? const BoxConstraints(maxWidth: 600)
+          : null,
       backgroundColor: Colors.transparent,
       builder: (ctx) => TransactionFormSheet(
         appState: appState,
@@ -47,6 +50,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
   late TextEditingController _amountCtrl;
   late TextEditingController _titleCtrl;
   late TextEditingController _tagInputCtrl;
+  final ScrollController _scrollCtrl = ScrollController();
   late DateTime _selectedDate;
   late TransactionStatus _status;
   late RecurrenceRule _recurrence;
@@ -54,6 +58,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
   bool _useCreditCard = false;
   bool _isIgnored = false;
   bool _showMoreOptions = false;
+  String? _errorMessage;
   String? _selectedAccountId;
   String? _destinationAccountId;
   String? _selectedCardId;
@@ -108,6 +113,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
     _amountCtrl.dispose();
     _titleCtrl.dispose();
     _tagInputCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -415,13 +421,29 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
     final amount = _parseAmount();
     final title = _titleCtrl.text.trim();
     if (amount <= 0 || title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Informe um valor maior que R\$ 0,00 e uma descrição.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      HapticFeedback.heavyImpact();
+      setState(() {
+        if (amount <= 0 && title.isEmpty) {
+          _errorMessage =
+              'Informe um valor maior que R\$ 0,00 e uma descrição.';
+        } else if (amount <= 0) {
+          _errorMessage = 'Informe um valor maior que R\$ 0,00.';
+        } else {
+          _errorMessage = 'Informe uma descrição para o lançamento.';
+        }
+      });
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
       return;
+    }
+
+    if (_errorMessage != null) {
+      setState(() => _errorMessage = null);
     }
 
     HapticFeedback.mediumImpact();
@@ -541,7 +563,6 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                 ),
                 const SizedBox(height: 10),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
@@ -553,37 +574,47 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                         ),
                       ),
                     ),
-                    Text(
-                      _isEditing ? 'Editar Lançamento' : 'Novo Lançamento',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3,
-                        color: isDark
-                            ? AppColors.darkTextPrimary
-                            : AppColors.lightTextPrimary,
+                    Expanded(
+                      child: Text(
+                        _isEditing ? 'Editar Lançamento' : 'Novo Lançamento',
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary,
+                        ),
                       ),
                     ),
-                    if (_isEditing)
-                      IconButton(
-                        onPressed: _confirmDelete,
-                        icon: Icon(
-                          Icons.delete_outline_rounded,
-                          color: AppColors.danger(context),
-                        ),
-                      )
-                    else
-                      TextButton(
-                        onPressed: _save,
-                        child: const Text(
-                          'Salvar',
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isEditing)
+                          IconButton(
+                            onPressed: _confirmDelete,
+                            tooltip: 'Excluir lançamento',
+                            icon: Icon(
+                              Icons.delete_outline_rounded,
+                              color: AppColors.danger(context),
+                            ),
+                          ),
+                        TextButton(
+                          onPressed: _save,
+                          child: const Text(
+                            'Salvar',
+                            style: TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -635,6 +666,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
           // Corpo do Formulário em Seções Agrupadas (Apple HIG Inset Grouped)
           Expanded(
             child: SingleChildScrollView(
+              controller: _scrollCtrl,
               padding: EdgeInsets.fromLTRB(16, 18, 16, bottomInset + 32),
               child: Center(
                 child: ConstrainedBox(
@@ -642,13 +674,60 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (_errorMessage != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.danger(context)
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.danger(context)
+                                  .withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                size: 18,
+                                color: AppColors.danger(context),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.danger(context),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       // 1. Campo de Valor Hero estilo Nubank (Centavos da direita para a esquerda)
                       HigCurrencyHeroField(
                         controller: _amountCtrl,
                         label: 'Valor do Lançamento',
                         accentColor: _accentColor,
                         autofocus: !_isEditing,
-                        onChanged: (_) => setState(() {}),
+                        onChanged: (_) => setState(() {
+                          if (_parseAmount() > 0 &&
+                              _titleCtrl.text.trim().isNotEmpty) {
+                            _errorMessage = null;
+                          } else if (_errorMessage != null &&
+                              _parseAmount() > 0) {
+                            _errorMessage = null;
+                          }
+                        }),
                         bottomAccessory: InkWell(
                           borderRadius: BorderRadius.circular(100),
                           onTap: () async {
@@ -741,6 +820,11 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                 Expanded(
                                   child: TextField(
                                     controller: _titleCtrl,
+                                    onChanged: (_) {
+                                      if (_errorMessage != null) {
+                                        setState(() => _errorMessage = null);
+                                      }
+                                    },
                                     textCapitalization:
                                         TextCapitalization.sentences,
                                     style: TextStyle(
