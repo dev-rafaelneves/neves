@@ -560,9 +560,9 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                     if (_isEditing)
                       IconButton(
                         onPressed: _confirmDelete,
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.delete_outline_rounded,
-                          color: AppColors.rose,
+                          color: AppColors.danger(context),
                         ),
                       )
                     else
@@ -957,7 +957,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                               const Divider(indent: 62, height: 1),
                               HigFormRow(
                                 icon: Icons.south_east_rounded,
-                                iconColor: AppColors.emerald,
+                                iconColor: AppColors.success(context),
                                 label: 'Conta de Destino',
                                 onTap: () => _pickAccount(isDestination: true),
                                 trailing: Row(
@@ -968,10 +968,10 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                         destAcc?.name ?? 'Selecionar',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
-                                          color: AppColors.emerald,
+                                          color: AppColors.success(context),
                                         ),
                                       ),
                                     ),
@@ -1012,7 +1012,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                   : 'Entra na projeção do fim do mês',
                               trailing: Switch.adaptive(
                                 value: _status == TransactionStatus.paid,
-                                activeTrackColor: AppColors.emerald,
+                                activeTrackColor: AppColors.success(context),
                                 onChanged: (val) {
                                   HapticFeedback.selectionClick();
                                   setState(() {
@@ -1056,7 +1056,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                             const Divider(indent: 62, height: 1),
                             HigFormRow(
                               icon: Icons.savings_rounded,
-                              iconColor: AppColors.emerald,
+                              iconColor: AppColors.success(context),
                               label: 'Vincular Caixinha',
                               subtitle: 'Soma no progresso da meta',
                               trailing: ConstrainedBox(
@@ -1080,10 +1080,10 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                         child: Text(
                                           g.name,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,
-                                            color: AppColors.emerald,
+                                            color: AppColors.success(context),
                                           ),
                                         ),
                                       ),
@@ -1098,7 +1098,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                           const Divider(indent: 62, height: 1),
                           HigFormRow(
                             icon: Icons.visibility_off_rounded,
-                            iconColor: AppColors.orange,
+                            iconColor: AppColors.warning(context),
                             label: 'Ignorar transação',
                             subtitle:
                                 'Não conta em categorias, insights, saldos e totais',

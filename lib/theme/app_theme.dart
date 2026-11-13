@@ -29,6 +29,23 @@ class AppColors {
   static const Color violet = Color(0xFF0D9488); // teal-600 (Verde-Azulado Secundário)
   static const Color cyan = Color(0xFF06B6D4); // cyan-500
   static const Color amber = Color(0xFFF59E0B); // amber-500
+
+  // Variantes com contraste AA (>= 4.5:1) para TEXTO sobre fundo claro.
+  static const Color successStrong = Color(0xFF047857); // emerald-700 (5,5:1)
+  static const Color dangerStrong = Color(0xFFE11D48); // rose-600 (4,7:1)
+  static const Color warningStrong = Color(0xFFC2410C); // orange-700 (5,2:1)
+
+  static bool _isDark(BuildContext c) =>
+      Theme.of(c).brightness == Brightness.dark;
+
+  /// Cor de texto/ícone de sucesso com contraste adequado ao tema atual.
+  static Color success(BuildContext c) => _isDark(c) ? emerald : successStrong;
+
+  /// Cor de texto/ícone de erro/despesa com contraste adequado ao tema atual.
+  static Color danger(BuildContext c) => _isDark(c) ? rose : dangerStrong;
+
+  /// Cor de texto/ícone de alerta com contraste adequado ao tema atual.
+  static Color warning(BuildContext c) => _isDark(c) ? orange : warningStrong;
 }
 
 /// Formatador estilo Nubank / Bancos Brasileiros:
@@ -91,6 +108,20 @@ class AppFormatters {
   static String currency(double value, {bool discreet = false}) {
     if (discreet) return 'R\$ ••••';
     return _currency.format(value);
+  }
+
+  /// Rótulo amigável de mês a partir de 'YYYY-MM' (ex.: 'Novembro/2026').
+  /// Com [short] = true retorna 'nov/26'.
+  static String monthLabel(String ym, {bool short = false}) {
+    final parts = ym.split('-');
+    if (parts.length != 2) return ym;
+    final y = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (y == null || m == null) return ym;
+    final dt = DateTime(y, m, 1);
+    if (short) return DateFormat('MMM/yy', 'pt_BR').format(dt);
+    final raw = DateFormat('MMMM/yyyy', 'pt_BR').format(dt);
+    return raw[0].toUpperCase() + raw.substring(1);
   }
 
   static String compactCurrency(double value, {bool discreet = false}) {

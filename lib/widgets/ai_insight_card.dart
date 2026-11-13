@@ -240,9 +240,9 @@ class _AiInsightCardState extends State<AiInsightCard> {
                 ),
                 child: Text(
                   _errorMessage!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
-                    color: AppColors.rose,
+                    color: AppColors.danger(context),
                   ),
                 ),
               )

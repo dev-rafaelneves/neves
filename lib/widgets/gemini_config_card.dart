@@ -310,10 +310,10 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
                       await _loadKey();
                     },
                     tooltip: 'Remover Chave',
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.delete_outline_rounded,
                       size: 20,
-                      color: AppColors.rose,
+                      color: AppColors.danger(context),
                     ),
                   ),
                 ],

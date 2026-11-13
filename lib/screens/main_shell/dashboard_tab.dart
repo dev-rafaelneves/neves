@@ -156,9 +156,9 @@ class _DashboardTabState extends State<DashboardTab> {
                                         .deleteAccount(existing.id),
                                   );
                                 },
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.delete_outline_rounded,
-                                  color: AppColors.rose,
+                                  color: AppColors.danger(context),
                                 ),
                               ),
                             TextButton(
@@ -192,19 +192,19 @@ class _DashboardTabState extends State<DashboardTab> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.error_outline_rounded,
-                              color: AppColors.rose,
+                              color: AppColors.danger(context),
                               size: 18,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 errorMsg!,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.rose,
+                                  color: AppColors.danger(context),
                                 ),
                               ),
                             ),
@@ -283,7 +283,7 @@ class _DashboardTabState extends State<DashboardTab> {
                                   return ActionChip(
                                     label: Text(
                                       suggestion,
-                                      style: const TextStyle(fontSize: 11.5),
+                                      style: const TextStyle(fontSize: 12),
                                     ),
                                     visualDensity: VisualDensity.compact,
                                     onPressed: () {
@@ -334,7 +334,7 @@ class _DashboardTabState extends State<DashboardTab> {
                         const Divider(indent: 62, height: 1),
                         HigFormRow(
                           icon: Icons.pie_chart_rounded,
-                          iconColor: AppColors.emerald,
+                          iconColor: AppColors.success(context),
                           label: 'Somar no Patrimônio',
                           subtitle: 'Inclui esta conta no cálculo de Net Worth',
                           trailing: Switch.adaptive(
@@ -495,9 +495,9 @@ class _DashboardTabState extends State<DashboardTab> {
                                         .deleteCreditCard(existing.id),
                                   );
                                 },
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.delete_outline_rounded,
-                                  color: AppColors.rose,
+                                  color: AppColors.danger(context),
                                 ),
                               ),
                             TextButton(
@@ -531,19 +531,19 @@ class _DashboardTabState extends State<DashboardTab> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.error_outline_rounded,
-                              color: AppColors.rose,
+                              color: AppColors.danger(context),
                               size: 18,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 errorMsg!,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.rose,
+                                  color: AppColors.danger(context),
                                 ),
                               ),
                             ),
@@ -618,7 +618,7 @@ class _DashboardTabState extends State<DashboardTab> {
                                   return ActionChip(
                                     label: Text(
                                       suggestion,
-                                      style: const TextStyle(fontSize: 11.5),
+                                      style: const TextStyle(fontSize: 12),
                                     ),
                                     visualDensity: VisualDensity.compact,
                                     onPressed: () {
@@ -637,7 +637,7 @@ class _DashboardTabState extends State<DashboardTab> {
                         const Divider(indent: 62, height: 1),
                         HigFormRow(
                           icon: Icons.event_busy_rounded,
-                          iconColor: AppColors.orange,
+                          iconColor: AppColors.warning(context),
                           label: 'Dia de Fechamento',
                           subtitle: 'Compras a partir deste dia vão p/ próxima fatura',
                           trailing: DropdownButton<int>(
@@ -664,7 +664,7 @@ class _DashboardTabState extends State<DashboardTab> {
                         const Divider(indent: 62, height: 1),
                         HigFormRow(
                           icon: Icons.event_available_rounded,
-                          iconColor: AppColors.emerald,
+                          iconColor: AppColors.success(context),
                           label: 'Dia de Vencimento',
                           subtitle: 'Data limite para pagamento da fatura',
                           trailing: DropdownButton<int>(
@@ -802,7 +802,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Competência: $ym',
+                    'Competência: ${AppFormatters.monthLabel(ym)}',
                     style: TextStyle(
                       fontSize: 12.5,
                       color: isDark
@@ -814,7 +814,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   HigCurrencyHeroField(
                     controller: amountCtrl,
                     label: 'Valor do Pagamento (Total ou Parcial)',
-                    accentColor: AppColors.emerald,
+                    accentColor: AppColors.success(context),
                   ),
                   const SizedBox(height: 16),
                   if (state.accounts.isNotEmpty)
@@ -865,7 +865,7 @@ class _DashboardTabState extends State<DashboardTab> {
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.emerald,
+                        backgroundColor: AppColors.successStrong,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 15),
@@ -921,7 +921,7 @@ class _DashboardTabState extends State<DashboardTab> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
                         color: isDark
@@ -1011,7 +1011,7 @@ class _DashboardTabState extends State<DashboardTab> {
                                 ? 'Competência'
                                 : 'Data Compra',
                             style: const TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: AppColors.indigoPrimary,
                             ),
@@ -1103,7 +1103,7 @@ class _DashboardTabState extends State<DashboardTab> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF059669), Color(0xFF065F46)],
+              colors: [Color(0xFF047857), Color(0xFF064E3B)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -1128,8 +1128,8 @@ class _DashboardTabState extends State<DashboardTab> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
+                        color: Color(0xE6FFFFFF),
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
                       ),
@@ -1152,7 +1152,7 @@ class _DashboardTabState extends State<DashboardTab> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 11.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1177,7 +1177,7 @@ class _DashboardTabState extends State<DashboardTab> {
               Text(
                 'Saldo Projetado no Fim do Mês: ${AppFormatters.currency(projectedBalance, discreet: discreet)}',
                 style: const TextStyle(
-                  color: Colors.white70,
+                  color: Color(0xE6FFFFFF),
                   fontSize: 12.5,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1206,8 +1206,8 @@ class _DashboardTabState extends State<DashboardTab> {
                               Text(
                                 'Receitas',
                                 style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11.5,
+                                  color: Color(0xE6FFFFFF),
+                                  fontSize: 12,
                                 ),
                               ),
                             ],
@@ -1239,8 +1239,8 @@ class _DashboardTabState extends State<DashboardTab> {
                               Text(
                                 'Despesas',
                                 style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11.5,
+                                  color: Color(0xE6FFFFFF),
+                                  fontSize: 12,
                                 ),
                               ),
                             ],
@@ -1263,8 +1263,8 @@ class _DashboardTabState extends State<DashboardTab> {
                         const Text(
                           'Poupança',
                           style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11.5,
+                            color: Color(0xE6FFFFFF),
+                            fontSize: 12,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -1320,7 +1320,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Center(
                       child: Text(
-                        'Nenhuma despesa registrada em $ym.\nToque em "+ Lançar" para adicionar.',
+                        'Nenhuma despesa registrada em ${AppFormatters.monthLabel(ym)}.\nToque em "+ Lançar" para adicionar.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 13,
@@ -1439,7 +1439,7 @@ class _DashboardTabState extends State<DashboardTab> {
             const Text(
               'CONTAS CORRENTES & CARTEIRA',
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.7,
                 color: AppColors.indigoPrimary,
@@ -1505,13 +1505,13 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
         ),
         const SizedBox(height: 14),
-        const Text(
+        Text(
           'INVESTIMENTOS & PATRIMÔNIO LÍQUIDO',
           style: TextStyle(
-            fontSize: 11.5,
+            fontSize: 12,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.7,
-            color: AppColors.emerald,
+            color: AppColors.success(context),
           ),
         ),
         const SizedBox(height: 8),
@@ -1535,9 +1535,9 @@ class _DashboardTabState extends State<DashboardTab> {
                     color: AppColors.emerald.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(11),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.trending_up_rounded,
-                    color: AppColors.emerald,
+                    color: AppColors.success(context),
                     size: 22,
                   ),
                 ),
@@ -1557,10 +1557,10 @@ class _DashboardTabState extends State<DashboardTab> {
                     acc.currentBalance,
                     discreet: discreet,
                   ),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.emerald,
+                    color: AppColors.success(context),
                   ),
                 ),
               ),
@@ -1586,7 +1586,7 @@ class _DashboardTabState extends State<DashboardTab> {
             const Text(
               'MEUS CARTÕES DE CRÉDITO',
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.7,
                 color: AppColors.indigoPrimary,
@@ -1729,7 +1729,7 @@ class _DashboardTabState extends State<DashboardTab> {
                             child: Text(
                               invStatus.label,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: invStatus == InvoiceStatus.paid
                                     ? AppColors.emerald
@@ -1753,7 +1753,7 @@ class _DashboardTabState extends State<DashboardTab> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Fatura de $ym',
+                                'Fatura de ${AppFormatters.monthLabel(ym)}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: isDark
@@ -1777,7 +1777,7 @@ class _DashboardTabState extends State<DashboardTab> {
                             ElevatedButton.icon(
                               onPressed: () => _showPayInvoiceDialog(card),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.emerald,
+                                backgroundColor: AppColors.successStrong,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                               ),
@@ -1806,14 +1806,14 @@ class _DashboardTabState extends State<DashboardTab> {
                         children: [
                           Text(
                             'Ocupado: ${AppFormatters.currency(used, discreet: discreet)}',
-                            style: const TextStyle(fontSize: 11.5),
+                            style: const TextStyle(fontSize: 12),
                           ),
                           Text(
                             'Disponível: ${AppFormatters.currency(avail, discreet: discreet)}',
-                            style: const TextStyle(
-                              fontSize: 11.5,
+                            style: TextStyle(
+                              fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.emerald,
+                              color: AppColors.success(context),
                             ),
                           ),
                         ],

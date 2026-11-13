@@ -516,7 +516,7 @@ Regras obrigatórias:
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('${info.title} copiado!'),
-                    backgroundColor: AppColors.emerald,
+                    backgroundColor: AppColors.successStrong,
                   ),
                 );
               }
@@ -666,7 +666,7 @@ Regras obrigatórias:
           content: Text(
             '${selected.length} lançamentos importados com sucesso!',
           ),
-          backgroundColor: AppColors.emerald,
+          backgroundColor: AppColors.successStrong,
         ),
       );
       Navigator.of(context).pop();
@@ -1155,7 +1155,7 @@ Regras obrigatórias:
                         const Text(
                           'FONTE',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.6,
                             color: AppColors.indigoPrimary,
@@ -1373,7 +1373,7 @@ Regras obrigatórias:
                                           child: Text(
                                             badgeText,
                                             style: TextStyle(
-                                              fontSize: 10.5,
+                                              fontSize: 12,
                                               fontWeight: FontWeight.w700,
                                               color: badgeColor,
                                             ),
@@ -1414,13 +1414,13 @@ Regras obrigatórias:
                               ),
                             ),
                             if (c.isDuplicate)
-                              const Padding(
-                                padding: EdgeInsets.only(left: 12, bottom: 4),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12, bottom: 4),
                                 child: Text(
                                   '⚠️ Possível duplicata já existente no seu extrato (desmarcado automaticamente)',
                                   style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: AppColors.orange,
+                                    fontSize: 12,
+                                    color: AppColors.warning(context),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),

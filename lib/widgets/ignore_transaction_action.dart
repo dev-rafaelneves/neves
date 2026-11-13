@@ -4,7 +4,10 @@ import '../services/app_state.dart';
 
 /// Alterna o estado "ignorada" de uma transação. Para parcelas com parcelas
 /// futuras, pergunta se deve estender a ação às próximas parcelas.
-Future<void> toggleIgnoreTransaction(
+///
+/// Retorna null se o usuário cancelou; caso contrário, true/false indicando
+/// se a ação foi estendida às parcelas futuras (útil para desfazer).
+Future<bool?> toggleIgnoreTransaction(
   BuildContext context,
   AppState state,
   TransactionModel tx,
@@ -43,7 +46,7 @@ Future<void> toggleIgnoreTransaction(
         ],
       ),
     );
-    if (choice == null) return;
+    if (choice == null) return null;
     includeFuture = choice == 1;
   }
 
@@ -52,4 +55,5 @@ Future<void> toggleIgnoreTransaction(
     ignore,
     includeFutureInstallments: includeFuture,
   );
+  return includeFuture;
 }

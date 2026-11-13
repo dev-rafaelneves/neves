@@ -30,6 +30,51 @@ class _TransactionsTabState extends State<TransactionsTab> {
   String _searchQuery = '';
   String _activeFilter = 'all'; // all | expense | income | pending | card
   String? _selectedTag;
+  final Set<String> _hiddenIds = {};
+
+  void _showUndoSnack(String message, Future<void> Function() onUndo) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(label: 'Desfazer', onPressed: onUndo),
+      ),
+    );
+  }
+
+  Future<bool> _confirmSwipe(DismissDirection dir, TransactionModel tx) async {
+    if (dir == DismissDirection.startToEnd) {
+      final wasIgnored = tx.isIgnored;
+      final includeFuture =
+          await toggleIgnoreTransaction(context, widget.appState, tx);
+      if (includeFuture != null && mounted) {
+        _showUndoSnack(
+          wasIgnored ? 'Lançamento reativado' : 'Lançamento ignorado',
+          () => widget.appState.setTransactionIgnored(
+            tx,
+            wasIgnored,
+            includeFutureInstallments: includeFuture,
+          ),
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _onDeleted(TransactionModel tx) async {
+    setState(() => _hiddenIds.add(tx.id));
+    await widget.appState.deleteTransaction(tx);
+    if (!mounted) return;
+    setState(() => _hiddenIds.remove(tx.id));
+    _showUndoSnack(
+      'Lançamento excluído',
+      () => widget.appState.addOrUpdateTransaction(tx),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +85,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
 
     var list = state.transactionsForMonth(ym, includeIgnored: true);
     final filterCard = state.getCardById(widget.cardFilterId);
+    list = list.where((t) => !_hiddenIds.contains(t.id)).toList();
     if (filterCard != null) {
       list = list.where((t) => t.cardId == filterCard.id).toList();
     }
@@ -235,7 +281,28 @@ class _TransactionsTabState extends State<TransactionsTab> {
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
-                          child: Opacity(
+                          child: Dismissible(
+                            key: ValueKey('tx_${tx.id}'),
+                            direction: tx.isInvoicePayment
+                                ? DismissDirection.startToEnd
+                                : DismissDirection.horizontal,
+                            confirmDismiss: (dir) => _confirmSwipe(dir, tx),
+                            onDismissed: (_) => _onDeleted(tx),
+                            background: _swipeBackground(
+                              color: AppColors.warningStrong,
+                              icon: tx.isIgnored
+                                  ? Icons.visibility_rounded
+                                  : Icons.visibility_off_rounded,
+                              label: tx.isIgnored ? 'Reativar' : 'Ignorar',
+                              alignment: Alignment.centerLeft,
+                            ),
+                            secondaryBackground: _swipeBackground(
+                              color: AppColors.dangerStrong,
+                              icon: Icons.delete_outline_rounded,
+                              label: 'Excluir',
+                              alignment: Alignment.centerRight,
+                            ),
+                            child: Opacity(
                             opacity: tx.isIgnored ? 0.45 : 1.0,
                             child: Material(
                             color:
@@ -321,7 +388,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
                                                   child: Text(
                                                     '${tx.installmentIndex}/${tx.installmentTotal}',
                                                     style: const TextStyle(
-                                                      fontSize: 10.5,
+                                                      fontSize: 12,
                                                       fontWeight:
                                                           FontWeight.w700,
                                                       color: AppColors
@@ -354,7 +421,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
                                                     (tag) => Text(
                                                       '#$tag',
                                                       style: const TextStyle(
-                                                        fontSize: 11,
+                                                        fontSize: 12,
                                                         fontWeight:
                                                             FontWeight.w600,
                                                         color: AppColors
@@ -394,8 +461,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
                                             toggleIgnoreTransaction(context, state, tx);
                                           },
                                           child: Padding(
-                                            padding: const EdgeInsets.only(
-                                                bottom: 4, top: 2),
+                                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
@@ -409,7 +475,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
                                                 Text(
                                                   tx.isIgnored ? 'Reativar' : 'Ignorar',
                                                   style: const TextStyle(
-                                                    fontSize: 10.5,
+                                                    fontSize: 12,
                                                     fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
@@ -440,7 +506,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
                                               child: Text(
                                                 isPaid ? 'Pago' : 'Pendente',
                                                 style: TextStyle(
-                                                  fontSize: 10.5,
+                                                  fontSize: 12,
                                                   fontWeight: FontWeight.w700,
                                                   color: isPaid
                                                       ? AppColors.emerald
@@ -456,6 +522,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
                               ),
                             ),
                             ),
+                            ),
                           ),
                         );
                       }),
@@ -466,6 +533,37 @@ class _TransactionsTabState extends State<TransactionsTab> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _swipeBackground({
+    required Color color,
+    required IconData icon,
+    required String label,
+    required Alignment alignment,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 22),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

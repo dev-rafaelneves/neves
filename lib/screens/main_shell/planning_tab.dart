@@ -70,7 +70,7 @@ class _PlanningTabState extends State<PlanningTab> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Competência $ym',
+                'Competência ${AppFormatters.monthLabel(ym)}',
                 style: TextStyle(
                   fontSize: 12.5,
                   color: isDark
@@ -194,9 +194,9 @@ class _PlanningTabState extends State<PlanningTab> {
                                 widget.appState.deleteGoal(existing.id),
                           );
                         },
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.delete_outline_rounded,
-                          color: AppColors.rose,
+                          color: AppColors.danger(context),
                         ),
                       )
                     else
@@ -207,7 +207,7 @@ class _PlanningTabState extends State<PlanningTab> {
                 HigCurrencyHeroField(
                   controller: targetCtrl,
                   label: 'Meta Final da Caixinha',
-                  accentColor: AppColors.emerald,
+                  accentColor: AppColors.success(context),
                   autofocus: existing == null,
                 ),
                 const SizedBox(height: 20),
@@ -228,9 +228,9 @@ class _PlanningTabState extends State<PlanningTab> {
                               color: AppColors.emerald.withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(9),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.savings_rounded,
-                              color: AppColors.emerald,
+                              color: AppColors.success(context),
                               size: 19,
                             ),
                           ),
@@ -264,10 +264,10 @@ class _PlanningTabState extends State<PlanningTab> {
                             const CentavosCurrencyFormatter(),
                           ],
                           textAlign: TextAlign.right,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.emerald,
+                            color: AppColors.success(context),
                           ),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
@@ -373,7 +373,7 @@ class _PlanningTabState extends State<PlanningTab> {
               HigCurrencyHeroField(
                 controller: ctrl,
                 label: 'Valor do Aporte',
-                accentColor: AppColors.emerald,
+                accentColor: AppColors.success(context),
                 autofocus: true,
               ),
               const SizedBox(height: 20),
@@ -390,7 +390,7 @@ class _PlanningTabState extends State<PlanningTab> {
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.emerald,
+                    backgroundColor: AppColors.successStrong,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 15),
@@ -599,7 +599,7 @@ class _PlanningTabState extends State<PlanningTab> {
                                     ? 'de ${AppFormatters.currency(limit, discreet: discreet)}'
                                     : 'Definir Teto >',
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12,
                                   color: limit > 0
                                       ? barColor
                                       : AppColors.indigoPrimary,
@@ -646,13 +646,13 @@ class _PlanningTabState extends State<PlanningTab> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'MINHAS CAIXINHAS & METAS',
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.7,
-                color: AppColors.emerald,
+                color: AppColors.success(context),
               ),
             ),
             TextButton.icon(
@@ -690,7 +690,7 @@ class _PlanningTabState extends State<PlanningTab> {
                           ),
                           child: Icon(
                             goal.icon,
-                            color: AppColors.emerald,
+                            color: AppColors.success(context),
                             size: 21,
                           ),
                         ),
@@ -721,9 +721,9 @@ class _PlanningTabState extends State<PlanningTab> {
                         IconButton(
                           onPressed: () => _showQuickDepositDialog(goal),
                           tooltip: 'Guardar Dinheiro',
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.add_circle_rounded,
-                            color: AppColors.emerald,
+                            color: AppColors.success(context),
                           ),
                         ),
                         IconButton(
@@ -741,7 +741,7 @@ class _PlanningTabState extends State<PlanningTab> {
                         backgroundColor: isDark
                             ? AppColors.darkBorder
                             : const Color(0xFFE2E8F0),
-                        color: AppColors.emerald,
+                        color: AppColors.success(context),
                       ),
                     ),
                   ],
