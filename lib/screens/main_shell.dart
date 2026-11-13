@@ -26,6 +26,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
   String? _cardFilterId;
+  String? _categoryFilterId;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +43,7 @@ class _MainShellState extends State<MainShell> {
                   context,
                   appState: widget.appState,
                 ),
-                backgroundColor: AppColors.indigoPrimary,
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 4,
                 icon: const Icon(Icons.add_rounded, size: 22),
@@ -62,6 +63,12 @@ class _MainShellState extends State<MainShell> {
               appState: widget.appState,
               onOpenCardStatement: (card) => setState(() {
                 _cardFilterId = card.id;
+                _categoryFilterId = null;
+                _selectedIndex = 1;
+              }),
+              onOpenCategoryStatement: (cat) => setState(() {
+                _categoryFilterId = cat.id;
+                _cardFilterId = null;
                 _selectedIndex = 1;
               }),
             ),
@@ -69,6 +76,9 @@ class _MainShellState extends State<MainShell> {
               appState: widget.appState,
               cardFilterId: _cardFilterId,
               onClearCardFilter: () => setState(() => _cardFilterId = null),
+              categoryFilterId: _categoryFilterId,
+              onClearCategoryFilter: () =>
+                  setState(() => _categoryFilterId = null),
             ),
             PlanningTab(appState: widget.appState),
             SettingsTab(appState: widget.appState),
@@ -78,7 +88,7 @@ class _MainShellState extends State<MainShell> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              height: 83,
+              constraints: const BoxConstraints(minHeight: 83),
               decoration: BoxDecoration(
                 color: isDark
                     ? AppColors.darkSurface.withValues(alpha: 0.85)
@@ -94,6 +104,7 @@ class _MainShellState extends State<MainShell> {
               child: SafeArea(
                 top: false,
                 child: Center(
+                  heightFactor: 1.0,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
                     child: Row(
@@ -112,7 +123,7 @@ class _MainShellState extends State<MainShell> {
                         BottomNavItem(
                           icon: Icons.receipt_long_outlined,
                           activeIcon: Icons.receipt_long_rounded,
-                          label: 'Extrato',
+                          label: 'Lançamentos',
                           isSelected: _selectedIndex == 1,
                           onTap: () {
                             HapticFeedback.selectionClick();

@@ -115,7 +115,7 @@ date,category,title,amount
     await tester.pumpAndSettle();
 
     expect(find.text('Resumo'), findsOneWidget);
-    expect(find.text('Extrato'), findsOneWidget);
+    expect(find.text('Lançamentos'), findsOneWidget);
     expect(find.text('Planejamento'), findsOneWidget);
     expect(find.text('Ajustes'), findsOneWidget);
 
@@ -154,5 +154,40 @@ date,category,title,amount
     expect(applyTyping('125050').text, '1.250,50');
     expect(CentavosCurrencyFormatter.parseValue('1.250,50'), 1250.50);
     expect(CentavosCurrencyFormatter.formatDouble(42.5), '42,50');
+  });
+
+  testWidgets('Renderiza MainShell sem overflow com fonte ampliada (1.6x)',
+      (tester) async {
+    final appState = AppState();
+    await appState.init();
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+        child: NevesFinanceApp(appState: appState),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Resumo'), findsOneWidget);
+    expect(find.text('Lançamentos'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Renderiza MainShell em layout tablet (1024x768) sem overflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final appState = AppState();
+    await appState.init();
+
+    await tester.pumpWidget(NevesFinanceApp(appState: appState));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Resumo'), findsOneWidget);
+    expect(find.text('Contas'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

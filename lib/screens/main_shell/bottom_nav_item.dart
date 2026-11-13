@@ -21,13 +21,14 @@ class BottomNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = isSelected
-        ? (isDark ? AppColors.indigoLight : AppColors.indigoPrimary)
+        ? (isDark ? AppColors.primaryLight : AppColors.primary)
         : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8));
 
     return Expanded(
       child: InkWell(
         onTap: onTap,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(

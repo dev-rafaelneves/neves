@@ -123,7 +123,7 @@ class AppLockGate extends StatefulWidget {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.indigoPrimary,
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
               ),
@@ -337,13 +337,13 @@ class _AppLockGateState extends State<AppLockGate>
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: filled
-                                ? AppColors.indigoPrimary
+                                ? AppColors.primary
                                 : Colors.transparent,
                             border: Border.all(
                               color: (_hasError || isLockedOut)
                                   ? AppColors.rose
                                   : (filled
-                                      ? AppColors.indigoPrimary
+                                      ? AppColors.primary
                                       : const Color(0xFF94A3B8)),
                               width: 2,
                             ),
@@ -396,7 +396,7 @@ class _AppLockGateState extends State<AppLockGate>
                                     child: Icon(
                                       Icons.fingerprint_rounded,
                                       size: 32,
-                                      color: AppColors.indigoPrimary,
+                                      color: AppColors.primary,
                                     ),
                                   ),
                                 ),

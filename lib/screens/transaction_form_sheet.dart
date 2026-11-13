@@ -53,6 +53,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
 
   bool _useCreditCard = false;
   bool _isIgnored = false;
+  bool _showMoreOptions = false;
   String? _selectedAccountId;
   String? _destinationAccountId;
   String? _selectedCardId;
@@ -94,6 +95,12 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
     _selectedGoalId = tx?.goalId;
     _installments = tx?.installmentTotal ?? 1;
     _tags = List<String>.from(tx?.tags ?? []);
+    _showMoreOptions = tx != null &&
+        (tx.isIgnored ||
+            tx.goalId != null ||
+            tx.tags.isNotEmpty ||
+            tx.recurrenceRule != RecurrenceRule.none ||
+            (!tx.isCreditCard && tx.status == TransactionStatus.pending));
   }
 
   @override
@@ -113,7 +120,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
       case TransactionType.expense:
         return AppColors.rose;
       case TransactionType.transfer:
-        return AppColors.indigoPrimary;
+        return AppColors.primary;
     }
   }
 
@@ -187,7 +194,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                       trailing: selected
                           ? const Icon(
                               Icons.check_circle_rounded,
-                              color: AppColors.indigoPrimary,
+                              color: AppColors.primary,
                             )
                           : null,
                     );
@@ -263,7 +270,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                   trailing: selected
                       ? const Icon(
                           Icons.check_circle_rounded,
-                          color: AppColors.indigoPrimary,
+                          color: AppColors.primary,
                         )
                       : null,
                 );
@@ -328,7 +335,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                   trailing: selected
                       ? const Icon(
                           Icons.check_circle_rounded,
-                          color: AppColors.indigoPrimary,
+                          color: AppColors.primary,
                         )
                       : null,
                 );
@@ -390,7 +397,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                       trailing: _installments == n
                           ? const Icon(
                               Icons.check_circle_rounded,
-                              color: AppColors.indigoPrimary,
+                              color: AppColors.primary,
                             )
                           : null,
                     );
@@ -573,7 +580,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                           style: TextStyle(
                             fontSize: 15.5,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.indigoPrimary,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
@@ -673,7 +680,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                 const Icon(
                                   Icons.calendar_today_rounded,
                                   size: 14,
-                                  color: AppColors.indigoPrimary,
+                                  color: AppColors.primary,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
@@ -693,7 +700,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                 const Icon(
                                   Icons.keyboard_arrow_down_rounded,
                                   size: 16,
-                                  color: AppColors.indigoPrimary,
+                                  color: AppColors.primary,
                                 ),
                               ],
                             ),
@@ -720,13 +727,13 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                   width: 34,
                                   height: 34,
                                   decoration: BoxDecoration(
-                                    color: AppColors.indigoPrimary
+                                    color: AppColors.primary
                                         .withValues(alpha: 0.13),
                                     borderRadius: BorderRadius.circular(9),
                                   ),
                                   child: const Icon(
                                     Icons.edit_note_rounded,
-                                    color: AppColors.indigoPrimary,
+                                    color: AppColors.primary,
                                     size: 20,
                                   ),
                                 ),
@@ -765,7 +772,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                             HigFormRow(
                               icon: selectedCat?.icon ?? Icons.category_rounded,
                               iconColor:
-                                  selectedCat?.color ?? AppColors.indigoPrimary,
+                                  selectedCat?.color ?? AppColors.primary,
                               label: 'Categoria',
                               onTap: () => _pickCategory(filteredCategories),
                               trailing: Row(
@@ -778,7 +785,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                       style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600,
-                                        color: AppColors.indigoPrimary,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ),
@@ -849,7 +856,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                             HigFormRow(
                               icon: Icons.credit_card_rounded,
                               iconColor: selectedCard?.color ??
-                                  AppColors.indigoPrimary,
+                                  AppColors.primary,
                               label: 'Cartão',
                               subtitle: selectedCard != null
                                   ? 'Fatura: ${selectedCard.computeCompetenceMonth(_selectedDate)}'
@@ -866,7 +873,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                       style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600,
-                                        color: AppColors.indigoPrimary,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ),
@@ -883,7 +890,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                               const Divider(indent: 62, height: 1),
                               HigFormRow(
                                 icon: Icons.view_week_rounded,
-                                iconColor: AppColors.violet,
+                                iconColor: AppColors.secondary,
                                 label: 'Parcelamento',
                                 subtitle: _installments > 1 && amountVal > 0
                                     ? '${_installments}x de ${AppFormatters.currency(amountVal / _installments)}'
@@ -902,7 +909,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                         style: const TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w700,
-                                          color: AppColors.indigoPrimary,
+                                          color: AppColors.primary,
                                         ),
                                       ),
                                     ),
@@ -921,7 +928,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                               icon: selectedAcc?.icon ??
                                   Icons.account_balance_rounded,
                               iconColor: selectedAcc?.color ??
-                                  AppColors.indigoPrimary,
+                                  AppColors.primary,
                               label: _type == TransactionType.transfer
                                   ? 'Conta de Origem'
                                   : 'Conta',
@@ -940,7 +947,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                       style: const TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600,
-                                        color: AppColors.indigoPrimary,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ),
@@ -990,11 +997,62 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                       ),
                       const SizedBox(height: 22),
 
-                      // 4. Seção: Status, Recorrência, Caixinha e Tags
-                      const HigSectionHeader(
-                        title: 'Planejamento & Opções',
+                      // 4. Seção recolhível: Mais opções (Status, Recorrência, Caixinha, Ignorar, Tags)
+                      InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(
+                            () => _showMoreOptions = !_showMoreOptions,
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'MAIS OPÇÕES',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                  color: isDark
+                                      ? AppColors.darkTextSecondary
+                                      : AppColors.lightTextSecondary,
+                                ),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _showMoreOptions ? 'Ocultar' : 'Mostrar',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    _showMoreOptions
+                                        ? Icons.expand_less_rounded
+                                        : Icons.expand_more_rounded,
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      HigGroupedCard(
+                      if (_showMoreOptions) ...[
+                        const SizedBox(height: 4),
+                        HigGroupedCard(
                         children: [
                           if (!_useCreditCard) ...[
                             HigFormRow(
@@ -1041,7 +1099,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                         style: const TextStyle(
                                           fontSize: 14.5,
                                           fontWeight: FontWeight.w600,
-                                          color: AppColors.indigoPrimary,
+                                          color: AppColors.primary,
                                         ),
                                       ),
                                     ),
@@ -1058,7 +1116,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                               icon: Icons.savings_rounded,
                               iconColor: AppColors.success(context),
                               label: 'Vincular Caixinha',
-                              subtitle: 'Soma no progresso da meta',
+                              subtitle: 'Soma no saldo da caixinha',
                               trailing: ConstrainedBox(
                                 constraints: const BoxConstraints(maxWidth: 165),
                                 child: DropdownButton<String?>(
@@ -1167,7 +1225,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                       },
                                       icon: const Icon(
                                         Icons.add_circle_rounded,
-                                        color: AppColors.indigoPrimary,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ],
@@ -1205,6 +1263,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                           ),
                         ],
                       ),
+                      ],
                       const SizedBox(height: 26),
 
                       // Botão Principal Apple HIG
@@ -1213,7 +1272,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                         child: ElevatedButton.icon(
                           onPressed: _save,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.indigoPrimary,
+                            backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 16),

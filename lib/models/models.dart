@@ -673,7 +673,7 @@ class GoalModel {
 enum ImportTargetMode {
   checking('Conta Corrente'),
   creditCard('Fatura de Cartão'),
-  cofrinho('Cofrinho / Caixinha'),
+  cofrinho('Caixinha'),
   transfer('Transferência');
 
   final String label;
@@ -681,9 +681,9 @@ enum ImportTargetMode {
 }
 
 enum CofrinhoOperationKind {
-  deposit('Aporte (- Conta / + Cofrinho)'),
-  withdraw('Resgate (+ Conta / - Cofrinho)'),
-  yieldGain('Rendimento (+ Cofrinho)');
+  deposit('Aporte (- Conta / + Caixinha)'),
+  withdraw('Resgate (+ Conta / - Caixinha)'),
+  yieldGain('Rendimento (+ Caixinha)');
 
   final String label;
   const CofrinhoOperationKind(this.label);

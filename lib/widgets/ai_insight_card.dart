@@ -130,7 +130,7 @@ class _AiInsightCardState extends State<AiInsightCard> {
                   height: 38,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AppColors.indigoPrimary, AppColors.violet],
+                      colors: [AppColors.primary, AppColors.secondary],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -189,7 +189,7 @@ class _AiInsightCardState extends State<AiInsightCard> {
                     icon: const Icon(
                       Icons.copy_rounded,
                       size: 18,
-                      color: AppColors.indigoPrimary,
+                      color: AppColors.primary,
                     ),
                   ),
                   IconButton(
@@ -198,7 +198,7 @@ class _AiInsightCardState extends State<AiInsightCard> {
                     icon: const Icon(
                       Icons.refresh_rounded,
                       size: 20,
-                      color: AppColors.indigoPrimary,
+                      color: AppColors.primary,
                     ),
                   ),
                 ],
@@ -217,15 +217,17 @@ class _AiInsightCardState extends State<AiInsightCard> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     const SizedBox(width: 12),
-                    Text(
-                      _isGenerating
-                          ? 'Analisando seu fluxo de caixa com o Gemini...'
-                          : 'Carregando análise...',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextSecondary,
+                    Flexible(
+                      child: Text(
+                        _isGenerating
+                            ? 'Analisando seu fluxo de caixa com o Gemini...'
+                            : 'Carregando análise...',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -281,7 +283,7 @@ class _AiInsightCardState extends State<AiInsightCard> {
                     child: ElevatedButton.icon(
                       onPressed: () => _generateInsight(forceRefresh: false),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.indigoPrimary,
+                        backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 11),
@@ -362,7 +364,7 @@ class _MarkdownFormattedView extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: isDark ? AppColors.indigoLight : AppColors.indigoPrimary,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
               ),
             ),
           ),
@@ -414,8 +416,8 @@ class _MarkdownFormattedView extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: isDark
-                        ? AppColors.indigoLight
-                        : AppColors.indigoPrimary,
+                        ? AppColors.primaryLight
+                        : AppColors.primary,
                   ),
                 ),
                 Expanded(child: _buildRichLine(itemText)),
@@ -438,8 +440,8 @@ class _MarkdownFormattedView extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     color: isDark
-                        ? AppColors.indigoLight
-                        : AppColors.indigoPrimary,
+                        ? AppColors.primaryLight
+                        : AppColors.primary,
                   ),
                 ),
                 Expanded(child: _buildRichLine(itemText)),

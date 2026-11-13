@@ -233,7 +233,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
     final created = await showDialog<GoalModel>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Novo Cofrinho / Caixinha'),
+        title: const Text('Nova Caixinha'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -241,7 +241,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
               controller: nameCtrl,
               autofocus: true,
               decoration: const InputDecoration(
-                labelText: 'Nome do Cofrinho (ex: Reserva Mercado Pago)',
+                labelText: 'Nome da Caixinha (ex: Reserva Mercado Pago)',
               ),
             ),
             const SizedBox(height: 12),
@@ -250,7 +250,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
               keyboardType: TextInputType.number,
               inputFormatters: const [CentavosCurrencyFormatter()],
               decoration: const InputDecoration(
-                labelText: 'Meta do Cofrinho (R\$)',
+                labelText: 'Objetivo da Caixinha (R\$)',
               ),
             ),
           ],
@@ -263,7 +263,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
           ElevatedButton(
             onPressed: () {
               final name = nameCtrl.text.trim().isEmpty
-                  ? 'Cofrinho Mercado Pago'
+                  ? 'Caixinha Mercado Pago'
                   : nameCtrl.text.trim();
               final target = CentavosCurrencyFormatter.parseValue(
                 targetCtrl.text,
@@ -278,7 +278,7 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
               );
               Navigator.of(ctx).pop(goal);
             },
-            child: const Text('Criar Cofrinho'),
+            child: const Text('Criar Caixinha'),
           ),
         ],
       ),
@@ -386,9 +386,9 @@ Regras obrigatórias:
         );
       case ImportTargetMode.cofrinho:
         return (
-          title: 'Prompt — Cofrinho / Caixinha (Mês Atual)',
+          title: 'Prompt — Caixinha (Mês Atual)',
           subtitle:
-              'Envie ao assistente do seu banco para gerar o CSV de aportes, resgates e rendimentos do Cofrinho no mês atual.',
+              'Envie ao assistente do seu banco para gerar o CSV de aportes, resgates e rendimentos da Caixinha no mês atual.',
           prompt:
               '''Gere uma tabela em formato CSV (separado por ponto e vírgula ";") contendo todas as movimentações dos meus Cofrinhos / Reservas / Dinheiro Guardado no mês atual, com exatamente 3 colunas: Data;Descricao;Valor
 
@@ -438,7 +438,7 @@ Regras obrigatórias:
           children: [
             const Icon(
               Icons.help_outline_rounded,
-              color: AppColors.indigoPrimary,
+              color: AppColors.primary,
               size: 22,
             ),
             const SizedBox(width: 8),
@@ -522,7 +522,7 @@ Regras obrigatórias:
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.indigoPrimary,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
             icon: const Icon(Icons.copy_rounded, size: 17),
@@ -550,7 +550,7 @@ Regras obrigatórias:
     if (_targetMode == ImportTargetMode.cofrinho && state.goals.isEmpty) {
       final defaultGoal = GoalModel(
         id: _uuid.v4(),
-        name: 'Cofrinho Principal',
+        name: 'Caixinha Principal',
         targetAmount: 10000.0,
         currentAmount: 0.0,
         colorValue: 0xFF059669,
@@ -688,7 +688,7 @@ Regras obrigatórias:
             tooltip: 'Ver Prompt de CSV para este modo',
             icon: const Icon(
               Icons.help_outline_rounded,
-              color: AppColors.indigoPrimary,
+              color: AppColors.primary,
             ),
           ),
         ],
@@ -734,7 +734,7 @@ Regras obrigatórias:
                                 vertical: 5,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.indigoPrimary.withValues(
+                                color: AppColors.primary.withValues(
                                   alpha: 0.10,
                                 ),
                                 borderRadius: BorderRadius.circular(20),
@@ -745,7 +745,7 @@ Regras obrigatórias:
                                   Icon(
                                     Icons.help_outline_rounded,
                                     size: 16,
-                                    color: AppColors.indigoPrimary,
+                                    color: AppColors.primary,
                                   ),
                                   SizedBox(width: 4),
                                   Text(
@@ -753,7 +753,7 @@ Regras obrigatórias:
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.indigoPrimary,
+                                      color: AppColors.primary,
                                     ),
                                   ),
                                 ],
@@ -815,7 +815,7 @@ Regras obrigatórias:
                         children: [
                           Expanded(
                             child: ChoiceChip(
-                              label: const Text('Cofrinho / Caixinha'),
+                              label: const Text('Caixinha'),
                               selected:
                                   _targetMode == ImportTargetMode.cofrinho,
                               onSelected: (_) {
@@ -883,14 +883,14 @@ Regras obrigatórias:
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.indigoSoft,
+                              color: AppColors.primarySoft,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               children: [
                                 const Icon(
                                   Icons.credit_card_rounded,
-                                  color: AppColors.indigoPrimary,
+                                  color: AppColors.primary,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 10),
@@ -910,7 +910,7 @@ Regras obrigatórias:
                                     '+ Criar Cartão Nubank',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.indigoPrimary,
+                                      color: AppColors.primary,
                                     ),
                                   ),
                                 ),
@@ -949,7 +949,7 @@ Regras obrigatórias:
                                           : state.goals.first.id,
                                       decoration: const InputDecoration(
                                         labelText:
-                                            'Cofrinho / Caixinha Padrão',
+                                            'Caixinha Padrão',
                                         isDense: true,
                                       ),
                                       items: state.goals
@@ -970,7 +970,7 @@ Regras obrigatórias:
                                       },
                                     )
                                   : const Text(
-                                      'Nenhum Cofrinho cadastrado.',
+                                      'Nenhuma Caixinha cadastrada.',
                                       style: TextStyle(fontSize: 13),
                                     ),
                             ),
@@ -981,7 +981,7 @@ Regras obrigatórias:
                                 Icons.add_circle_outline_rounded,
                                 size: 18,
                               ),
-                              label: const Text('+ Cofrinho'),
+                              label: const Text('+ Caixinha'),
                             ),
                           ],
                         ),
@@ -1111,7 +1111,7 @@ Regras obrigatórias:
                             child: ElevatedButton.icon(
                               onPressed: _pickFile,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.indigoPrimary,
+                                backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 12),
@@ -1158,7 +1158,7 @@ Regras obrigatórias:
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.6,
-                            color: AppColors.indigoPrimary,
+                            color: AppColors.primary,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1169,7 +1169,7 @@ Regras obrigatórias:
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.indigoPrimary
+                              color: AppColors.primary
                                   .withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -1180,7 +1180,7 @@ Regras obrigatórias:
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.indigoPrimary,
+                                color: AppColors.primary,
                               ),
                             ),
                           ),
@@ -1221,7 +1221,7 @@ Regras obrigatórias:
                                       size: 16,
                                       color: _aiCategorizedSuccess
                                           ? AppColors.emerald
-                                          : AppColors.indigoPrimary,
+                                          : AppColors.primary,
                                     ),
                               label: Text(
                                 _isAiCategorizing
@@ -1234,7 +1234,7 @@ Regras obrigatórias:
                                   fontWeight: FontWeight.w700,
                                   color: _aiCategorizedSuccess
                                       ? AppColors.emerald
-                                      : AppColors.indigoPrimary,
+                                      : AppColors.primary,
                                 ),
                               ),
                             ),
@@ -1248,6 +1248,44 @@ Regras obrigatórias:
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
+                          ),
+                          Builder(
+                            builder: (context) {
+                              final selected = _candidates
+                                  .where((c) => c.selected)
+                                  .toList();
+                              final allIgnored = selected.isNotEmpty &&
+                                  selected.every((c) => c.ignored);
+                              return TextButton.icon(
+                                onPressed: selected.isEmpty
+                                    ? null
+                                    : () => setState(() {
+                                          for (final c in selected) {
+                                            c.ignored = !allIgnored;
+                                          }
+                                        }),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: allIgnored
+                                      ? AppColors.primary
+                                      : AppColors.warning(context),
+                                ),
+                                icon: Icon(
+                                  allIgnored
+                                      ? Icons.visibility_rounded
+                                      : Icons.visibility_off_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  allIgnored
+                                      ? 'Reativar selecionados'
+                                      : 'Ignorar selecionados',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -1271,16 +1309,16 @@ Regras obrigatórias:
                     if (_targetMode == ImportTargetMode.cofrinho) {
                       switch (c.cofrinhoOp) {
                         case CofrinhoOperationKind.deposit:
-                          badgeColor = AppColors.indigoPrimary;
-                          badgeText = 'Aporte (+ Cofrinho) ⇄';
+                          badgeColor = AppColors.primary;
+                          badgeText = 'Aporte (+ Caixinha) ⇄';
                           break;
                         case CofrinhoOperationKind.withdraw:
                           badgeColor = AppColors.amber;
-                          badgeText = 'Resgate (- Cofrinho) ⇄';
+                          badgeText = 'Resgate (- Caixinha) ⇄';
                           break;
                         case CofrinhoOperationKind.yieldGain:
                           badgeColor = AppColors.emerald;
-                          badgeText = 'Rendimento (+ Cofrinho) ⇄';
+                          badgeText = 'Rendimento (+ Caixinha) ⇄';
                           break;
                       }
                     } else if (_targetMode == ImportTargetMode.transfer) {
@@ -1443,11 +1481,11 @@ Regras obrigatórias:
                                         (g) => DropdownMenuItem(
                                           value: g.id,
                                           child: Text(
-                                            'Cofrinho: ${g.name}',
+                                            'Caixinha: ${g.name}',
                                             style: const TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w600,
-                                              color: AppColors.indigoPrimary,
+                                              color: AppColors.primary,
                                             ),
                                           ),
                                         ),
@@ -1533,7 +1571,7 @@ Regras obrigatórias:
                 child: ElevatedButton.icon(
                   onPressed: _confirmImport,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.indigoPrimary,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(

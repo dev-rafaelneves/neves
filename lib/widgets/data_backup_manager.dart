@@ -248,7 +248,7 @@ class _DataBackupManagerState extends State<DataBackupManager> {
                 : _handleSaveToDocuments,
             leading: const Icon(
               Icons.folder_zip_outlined,
-              color: AppColors.indigoPrimary,
+              color: AppColors.primary,
               size: 20,
             ),
             title: const Text(
@@ -261,7 +261,7 @@ class _DataBackupManagerState extends State<DataBackupManager> {
             onTap: (_isExporting || _isImporting) ? null : _handleExportData,
             leading: const Icon(
               Icons.ios_share_rounded,
-              color: AppColors.indigoPrimary,
+              color: AppColors.primary,
               size: 20,
             ),
             title: const Text(
@@ -274,7 +274,7 @@ class _DataBackupManagerState extends State<DataBackupManager> {
             onTap: (_isExporting || _isImporting) ? null : _handleImportData,
             leading: const Icon(
               Icons.restore_page_outlined,
-              color: AppColors.indigoPrimary,
+              color: AppColors.primary,
               size: 20,
             ),
             title: const Text(

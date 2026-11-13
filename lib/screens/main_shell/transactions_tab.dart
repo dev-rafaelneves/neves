@@ -15,11 +15,17 @@ class TransactionsTab extends StatefulWidget {
   final String? cardFilterId;
   final VoidCallback? onClearCardFilter;
 
+  /// Quando definido, filtra os lançamentos por categoria.
+  final String? categoryFilterId;
+  final VoidCallback? onClearCategoryFilter;
+
   const TransactionsTab({
     super.key,
     required this.appState,
     this.cardFilterId,
     this.onClearCardFilter,
+    this.categoryFilterId,
+    this.onClearCategoryFilter,
   });
 
   @override
@@ -85,9 +91,13 @@ class _TransactionsTabState extends State<TransactionsTab> {
 
     var list = state.transactionsForMonth(ym, includeIgnored: true);
     final filterCard = state.getCardById(widget.cardFilterId);
+    final filterCategory = state.getCategoryById(widget.categoryFilterId);
     list = list.where((t) => !_hiddenIds.contains(t.id)).toList();
     if (filterCard != null) {
       list = list.where((t) => t.cardId == filterCard.id).toList();
+    }
+    if (filterCategory != null) {
+      list = list.where((t) => t.categoryId == filterCategory.id).toList();
     }
     if (_searchQuery.trim().isNotEmpty) {
       final q = _searchQuery.trim().toLowerCase();
@@ -121,7 +131,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
           centerTitle: false,
           titleSpacing: 20,
           title: Text(
-            'Extrato',
+            'Lançamentos',
             style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
@@ -143,7 +153,10 @@ class _TransactionsTabState extends State<TransactionsTab> {
           sliver: SliverToBoxAdapter(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
+                constraints: BoxConstraints(
+                  maxWidth:
+                      MediaQuery.sizeOf(context).width >= 840 ? 720 : 480,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -169,6 +182,42 @@ class _TransactionsTabState extends State<TransactionsTab> {
                             ),
                             TextButton(
                               onPressed: widget.onClearCardFilter,
+                              child: const Text('Limpar'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    if (filterCategory != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: filterCategory.color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              filterCategory.icon,
+                              size: 18,
+                              color: filterCategory.color,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Categoria: ${filterCategory.name}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: widget.onClearCategoryFilter,
                               child: const Text('Limpar'),
                             ),
                           ],
@@ -272,260 +321,22 @@ class _TransactionsTabState extends State<TransactionsTab> {
                           ),
                         ),
                       )
-                    else
-                      ...list.map((tx) {
-                        final cat = state.getCategoryById(tx.categoryId);
-                        final card = state.getCardById(tx.cardId);
-                        final acc = state.getAccountById(tx.accountId);
-                        final isPaid = tx.status == TransactionStatus.paid;
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Dismissible(
-                            key: ValueKey('tx_${tx.id}'),
-                            direction: tx.isInvoicePayment
-                                ? DismissDirection.startToEnd
-                                : DismissDirection.horizontal,
-                            confirmDismiss: (dir) => _confirmSwipe(dir, tx),
-                            onDismissed: (_) => _onDeleted(tx),
-                            background: _swipeBackground(
-                              color: AppColors.warningStrong,
-                              icon: tx.isIgnored
-                                  ? Icons.visibility_rounded
-                                  : Icons.visibility_off_rounded,
-                              label: tx.isIgnored ? 'Reativar' : 'Ignorar',
-                              alignment: Alignment.centerLeft,
-                            ),
-                            secondaryBackground: _swipeBackground(
-                              color: AppColors.dangerStrong,
-                              icon: Icons.delete_outline_rounded,
-                              label: 'Excluir',
-                              alignment: Alignment.centerRight,
-                            ),
-                            child: Opacity(
-                            opacity: tx.isIgnored ? 0.45 : 1.0,
-                            child: Material(
-                            color:
-                                isDark ? AppColors.darkSurface : Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: BorderSide(
-                                color: isDark
-                                    ? AppColors.darkBorder
-                                    : AppColors.lightBorder,
-                              ),
-                            ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(14),
-                              onTap: () => TransactionFormSheet.show(
-                                context,
-                                appState: state,
-                                initialTransaction: tx,
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 42,
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                        color: (cat?.color ??
-                                                AppColors.indigoPrimary)
-                                            .withValues(alpha: 0.14),
-                                        borderRadius: BorderRadius.circular(11),
-                                      ),
-                                      child: Icon(
-                                        cat?.icon ?? Icons.swap_horiz_rounded,
-                                        color: cat?.color ??
-                                            AppColors.indigoPrimary,
-                                        size: 21,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Flexible(
-                                                child: Text(
-                                                  tx.title,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 14.5,
-                                                    decoration: tx.isIgnored
-                                                        ? TextDecoration.lineThrough
-                                                        : null,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (tx.isInstallment) ...[
-                                                const SizedBox(width: 6),
-                                                Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 2,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: AppColors
-                                                        .indigoPrimary
-                                                        .withValues(
-                                                            alpha: 0.12),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            6),
-                                                  ),
-                                                  child: Text(
-                                                    '${tx.installmentIndex}/${tx.installmentTotal}',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: AppColors
-                                                          .indigoPrimary,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            '${DateFormat('dd/MM').format(tx.date)} • ${cat?.name ?? 'Transferência'} • ${card != null ? '💳 ${card.name}' : (acc?.name ?? '')}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: isDark
-                                                  ? AppColors.darkTextSecondary
-                                                  : AppColors
-                                                      .lightTextSecondary,
-                                            ),
-                                          ),
-                                          if (tx.tags.isNotEmpty) ...[
-                                            const SizedBox(height: 4),
-                                            Wrap(
-                                              spacing: 4,
-                                              children: tx.tags
-                                                  .map(
-                                                    (tag) => Text(
-                                                      '#$tag',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color: AppColors
-                                                            .indigoPrimary,
-                                                      ),
-                                                    ),
-                                                  )
-                                                  .toList(),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          '${tx.type == TransactionType.income ? '+' : (tx.type == TransactionType.expense ? '-' : '')} ${AppFormatters.currency(tx.amount, discreet: discreet)}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 14.5,
-                                            color: tx.type ==
-                                                    TransactionType.income
-                                                ? AppColors.emerald
-                                                : (tx.type ==
-                                                        TransactionType.expense
-                                                    ? AppColors.rose
-                                                    : AppColors.indigoPrimary),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        InkWell(
-                                          onTap: () {
-                                            HapticFeedback.selectionClick();
-                                            toggleIgnoreTransaction(context, state, tx);
-                                          },
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  tx.isIgnored
-                                                      ? Icons.visibility_rounded
-                                                      : Icons.visibility_off_rounded,
-                                                  size: 13,
-                                                ),
-                                                const SizedBox(width: 3),
-                                                Text(
-                                                  tx.isIgnored ? 'Reativar' : 'Ignorar',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        if (!tx.isCreditCard)
-                                          InkWell(
-                                            onTap: () {
-                                              HapticFeedback.selectionClick();
-                                              state.toggleTransactionPaid(tx);
-                                            },
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 7,
-                                                vertical: 2,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: (isPaid
-                                                        ? AppColors.emerald
-                                                        : AppColors.orange)
-                                                    .withValues(alpha: 0.14),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                isPaid ? 'Pago' : 'Pendente',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: isPaid
-                                                      ? AppColors.emerald
-                                                      : AppColors.orange,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            ),
-                            ),
-                          ),
-                        );
-                      }),
+                    else ...[
+                      _buildSummaryBar(
+                        context,
+                        list: list,
+                        discreet: discreet,
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 12),
+                      ..._buildGroupedItems(
+                        context,
+                        state: state,
+                        list: list,
+                        discreet: discreet,
+                        isDark: isDark,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -533,6 +344,411 @@ class _TransactionsTabState extends State<TransactionsTab> {
           ),
         ),
       ],
+    );
+  }
+
+  double _netTotal(List<TransactionModel> txs) {
+    double sum = 0.0;
+    for (final t in txs) {
+      if (t.isIgnored || t.isInvoicePayment) continue;
+      if (t.type == TransactionType.income) {
+        sum += t.amount;
+      } else if (t.type == TransactionType.expense) {
+        sum -= t.amount;
+      }
+    }
+    return sum;
+  }
+
+  String _dayLabel(DateTime day) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (day == today) return 'Hoje';
+    if (day == yesterday) return 'Ontem';
+    final raw = DateFormat("EEE, dd 'de' MMM", 'pt_BR').format(day);
+    return raw[0].toUpperCase() + raw.substring(1);
+  }
+
+  Widget _buildSummaryBar(
+    BuildContext context, {
+    required List<TransactionModel> list,
+    required bool discreet,
+    required bool isDark,
+  }) {
+    final activeCount = list.where((t) => !t.isIgnored).length;
+    final ignoredCount = list.length - activeCount;
+    final net = _netTotal(list);
+    final sign = net > 0 ? '+' : (net < 0 ? '-' : '');
+    final totalColor = net > 0
+        ? AppColors.success(context)
+        : (net < 0 ? AppColors.danger(context) : AppColors.primary);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Text(
+              ignoredCount > 0
+                  ? '$activeCount ativos • $ignoredCount ignorados'
+                  : '$activeCount ${activeCount == 1 ? 'lançamento' : 'lançamentos'}',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$sign${AppFormatters.currency(net.abs(), discreet: discreet)}',
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
+              color: totalColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildGroupedItems(
+    BuildContext context, {
+    required AppState state,
+    required List<TransactionModel> list,
+    required bool discreet,
+    required bool isDark,
+  }) {
+    final groups = <DateTime, List<TransactionModel>>{};
+    for (final tx in list) {
+      final day = DateTime(tx.date.year, tx.date.month, tx.date.day);
+      groups.putIfAbsent(day, () => []).add(tx);
+    }
+    final sortedDays = groups.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    final widgets = <Widget>[];
+    for (final day in sortedDays) {
+      final items = groups[day]!;
+      final dayNet = _netTotal(items);
+      final sign = dayNet > 0 ? '+' : (dayNet < 0 ? '-' : '');
+      final dayLabel = _dayLabel(day);
+
+      widgets.add(
+        Semantics(
+          header: true,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 8, left: 4, right: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  dayLabel,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
+                Text(
+                  '$sign${AppFormatters.currency(dayNet.abs(), discreet: discreet)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: dayNet > 0
+                        ? AppColors.success(context)
+                        : (dayNet < 0
+                            ? AppColors.danger(context)
+                            : (isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      for (final tx in items) {
+        widgets.add(
+          _buildTransactionCard(
+            context,
+            state: state,
+            tx: tx,
+            discreet: discreet,
+            isDark: isDark,
+          ),
+        );
+      }
+    }
+    return widgets;
+  }
+
+  Widget _buildTransactionCard(
+    BuildContext context, {
+    required AppState state,
+    required TransactionModel tx,
+    required bool discreet,
+    required bool isDark,
+  }) {
+    final cat = state.getCategoryById(tx.categoryId);
+    final card = state.getCardById(tx.cardId);
+    final acc = state.getAccountById(tx.accountId);
+    final isPaid = tx.status == TransactionStatus.paid;
+    final typeWord = tx.type == TransactionType.income
+        ? 'receita'
+        : (tx.type == TransactionType.expense ? 'despesa' : 'transferência');
+    final statusWord = tx.isCreditCard
+        ? 'no cartão ${card?.name ?? ''}'
+        : (isPaid ? 'pago' : 'pendente');
+    final semanticLabel = discreet
+        ? '${tx.title}, valor oculto, $typeWord, ${DateFormat('dd/MM').format(tx.date)}'
+        : '${tx.title}, ${AppFormatters.currency(tx.amount)}, $typeWord, ${DateFormat('dd/MM').format(tx.date)}, ${cat?.name ?? 'Transferência'}, $statusWord${tx.isIgnored ? ', ignorada' : ''}';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Dismissible(
+        key: ValueKey('tx_${tx.id}'),
+        direction: tx.isInvoicePayment
+            ? DismissDirection.startToEnd
+            : DismissDirection.horizontal,
+        confirmDismiss: (dir) => _confirmSwipe(dir, tx),
+        onDismissed: (_) => _onDeleted(tx),
+        background: _swipeBackground(
+          color: AppColors.warningStrong,
+          icon: tx.isIgnored
+              ? Icons.visibility_rounded
+              : Icons.visibility_off_rounded,
+          label: tx.isIgnored ? 'Reativar' : 'Ignorar',
+          alignment: Alignment.centerLeft,
+        ),
+        secondaryBackground: _swipeBackground(
+          color: AppColors.dangerStrong,
+          icon: Icons.delete_outline_rounded,
+          label: 'Excluir',
+          alignment: Alignment.centerRight,
+        ),
+        child: Semantics(
+          button: true,
+          label: semanticLabel,
+          child: Opacity(
+            opacity: tx.isIgnored ? 0.45 : 1.0,
+            child: Material(
+              color: isDark ? AppColors.darkSurface : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                ),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => TransactionFormSheet.show(
+                  context,
+                  appState: state,
+                  initialTransaction: tx,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: (cat?.color ?? AppColors.primary)
+                              .withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: Icon(
+                          cat?.icon ?? Icons.swap_horiz_rounded,
+                          color: cat?.color ?? AppColors.primary,
+                          size: 21,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    tx.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14.5,
+                                      decoration: tx.isIgnored
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                                if (tx.isInstallment) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '${tx.installmentIndex}/${tx.installmentTotal}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${DateFormat('dd/MM').format(tx.date)} • ${cat?.name ?? 'Transferência'} • ${card != null ? '💳 ${card.name}' : (acc?.name ?? '')}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.lightTextSecondary,
+                              ),
+                            ),
+                            if (tx.tags.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 4,
+                                children: tx.tags
+                                    .map(
+                                      (tag) => Text(
+                                        '#$tag',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${tx.type == TransactionType.income ? '+' : (tx.type == TransactionType.expense ? '-' : '')} ${AppFormatters.currency(tx.amount, discreet: discreet)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14.5,
+                              color: tx.type == TransactionType.income
+                                  ? AppColors.success(context)
+                                  : (tx.type == TransactionType.expense
+                                      ? AppColors.danger(context)
+                                      : AppColors.primary),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              toggleIgnoreTransaction(context, state, tx);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 4,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    tx.isIgnored
+                                        ? Icons.visibility_rounded
+                                        : Icons.visibility_off_rounded,
+                                    size: 13,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    tx.isIgnored ? 'Reativar' : 'Ignorar',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (!tx.isCreditCard)
+                            InkWell(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                state.toggleTransactionPaid(tx);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: (isPaid
+                                          ? AppColors.emerald
+                                          : AppColors.orange)
+                                      .withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isPaid ? 'Pago' : 'Pendente',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: isPaid
+                                        ? AppColors.success(context)
+                                        : AppColors.warning(context),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

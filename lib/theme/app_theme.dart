@@ -19,14 +19,14 @@ class AppColors {
   static const Color darkTextSecondary = Color(0xFF94A3B8); // slate-400
 
   // Accents (Paleta Verde Financeiro Apple HIG)
-  static const Color indigoPrimary = Color(0xFF059669); // emerald-600 (Verde Principal)
-  static const Color indigoLight = Color(0xFF10B981); // emerald-500 (Verde Claro)
-  static const Color indigoSoft = Color(0xFFECFDF5); // emerald-50 (Verde Suave)
+  static const Color primary = Color(0xFF059669); // emerald-600 (Verde Principal)
+  static const Color primaryLight = Color(0xFF10B981); // emerald-500 (Verde Claro)
+  static const Color primarySoft = Color(0xFFECFDF5); // emerald-50 (Verde Suave)
   static const Color emerald = Color(0xFF10B981); // emerald-500
   static const Color orange = Color(0xFFF97316); // orange-500
   static const Color rose = Color(0xFFF43F5E); // rose-500
   static const Color blue = Color(0xFF3B82F6); // blue-500
-  static const Color violet = Color(0xFF0D9488); // teal-600 (Verde-Azulado Secundário)
+  static const Color secondary = Color(0xFF0D9488); // teal-600 (Verde-Azulado Secundário)
   static const Color cyan = Color(0xFF06B6D4); // cyan-500
   static const Color amber = Color(0xFFF59E0B); // amber-500
 
@@ -217,7 +217,7 @@ class HigFormRow extends StatelessWidget {
   const HigFormRow({
     super.key,
     required this.icon,
-    this.iconColor = AppColors.indigoPrimary,
+    this.iconColor = AppColors.primary,
     required this.label,
     this.subtitle,
     required this.trailing,
@@ -305,7 +305,7 @@ class HigCurrencyHeroField extends StatelessWidget {
     super.key,
     required this.controller,
     required this.label,
-    this.accentColor = AppColors.indigoPrimary,
+    this.accentColor = AppColors.primary,
     this.autofocus = false,
     this.onChanged,
     this.bottomAccessory,
@@ -402,10 +402,10 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.lightBackground,
-      primaryColor: AppColors.indigoPrimary,
+      primaryColor: AppColors.primary,
       colorScheme: const ColorScheme.light(
-        primary: AppColors.indigoPrimary,
-        secondary: AppColors.indigoLight,
+        primary: AppColors.primary,
+        secondary: AppColors.primaryLight,
         surface: AppColors.lightSurface,
         onSurface: AppColors.lightTextPrimary,
         error: AppColors.rose,
@@ -438,7 +438,7 @@ class AppTheme {
         space: 1,
       ),
       cupertinoOverrideTheme: const CupertinoThemeData(
-        primaryColor: AppColors.indigoPrimary,
+        primaryColor: AppColors.primary,
         brightness: Brightness.light,
       ),
     );
@@ -449,10 +449,10 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.darkBackground,
-      primaryColor: AppColors.indigoLight,
+      primaryColor: AppColors.primaryLight,
       colorScheme: const ColorScheme.dark(
-        primary: AppColors.indigoLight,
-        secondary: AppColors.indigoPrimary,
+        primary: AppColors.primaryLight,
+        secondary: AppColors.primary,
         surface: AppColors.darkSurface,
         onSurface: AppColors.darkTextPrimary,
         error: AppColors.rose,
@@ -485,7 +485,7 @@ class AppTheme {
         space: 1,
       ),
       cupertinoOverrideTheme: const CupertinoThemeData(
-        primaryColor: AppColors.indigoLight,
+        primaryColor: AppColors.primaryLight,
         brightness: Brightness.dark,
       ),
     );

@@ -151,7 +151,7 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
                             icon: const Icon(
                               Icons.content_paste_rounded,
                               size: 19,
-                              color: AppColors.indigoPrimary,
+                              color: AppColors.primary,
                             ),
                             onPressed: () async {
                               final data =
@@ -216,7 +216,7 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
                             if (ctx.mounted) Navigator.of(ctx).pop();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.indigoPrimary,
+                            backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                           ),
                           child: const Text('Salvar Chave'),
@@ -259,7 +259,7 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
                   height: 38,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AppColors.indigoPrimary, AppColors.violet],
+                      colors: [AppColors.primary, AppColors.secondary],
                     ),
                     borderRadius: BorderRadius.circular(10),
                   ),

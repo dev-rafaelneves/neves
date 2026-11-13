@@ -119,7 +119,7 @@ class _SettingsTabState extends State<SettingsTab> {
                       const Divider(indent: 62, height: 1),
                       HigFormRow(
                         icon: Icons.swap_vert_rounded,
-                        iconColor: AppColors.indigoPrimary,
+                        iconColor: AppColors.primary,
                         label: 'Natureza',
                         trailing: CupertinoSlidingSegmentedControl<
                             TransactionType>(
@@ -198,7 +198,7 @@ class _SettingsTabState extends State<SettingsTab> {
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.indigoPrimary,
+                        backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 15),
@@ -275,7 +275,10 @@ class _SettingsTabState extends State<SettingsTab> {
           sliver: SliverToBoxAdapter(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
+                constraints: BoxConstraints(
+                  maxWidth:
+                      MediaQuery.sizeOf(context).width >= 840 ? 720 : 480,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -369,7 +372,7 @@ class _SettingsTabState extends State<SettingsTab> {
                         onTap: _showNewCategoryDialog,
                         leading: const Icon(
                           Icons.category_rounded,
-                          color: AppColors.indigoPrimary,
+                          color: AppColors.primary,
                         ),
                         title: const Text(
                           'Criar Nova Categoria',
@@ -418,10 +421,10 @@ class _SettingsTabState extends State<SettingsTab> {
                               HapticFeedback.selectionClick();
                               state.toggleDiscreetMode();
                             },
-                            activeTrackColor: AppColors.indigoPrimary,
+                            activeTrackColor: AppColors.primary,
                             secondary: const Icon(
                               Icons.visibility_off_outlined,
-                              color: AppColors.indigoPrimary,
+                              color: AppColors.primary,
                               size: 20,
                             ),
                             title: const Text(
@@ -444,7 +447,7 @@ class _SettingsTabState extends State<SettingsTab> {
                             ),
                             leading: const Icon(
                               Icons.lock_outline_rounded,
-                              color: AppColors.indigoPrimary,
+                              color: AppColors.primary,
                               size: 20,
                             ),
                             title: const Text(
@@ -471,10 +474,10 @@ class _SettingsTabState extends State<SettingsTab> {
                                     state.toggleBiometrics();
                                   }
                                 : null,
-                            activeTrackColor: AppColors.indigoPrimary,
+                            activeTrackColor: AppColors.primary,
                             secondary: const Icon(
                               Icons.fingerprint_rounded,
-                              color: AppColors.indigoPrimary,
+                              color: AppColors.primary,
                               size: 20,
                             ),
                             title: const Text(
@@ -496,10 +499,10 @@ class _SettingsTabState extends State<SettingsTab> {
                               HapticFeedback.selectionClick();
                               state.toggleBlockScreenshots();
                             },
-                            activeTrackColor: AppColors.indigoPrimary,
+                            activeTrackColor: AppColors.primary,
                             secondary: const Icon(
                               Icons.security_rounded,
-                              color: AppColors.indigoPrimary,
+                              color: AppColors.primary,
                               size: 20,
                             ),
                             title: const Text(
@@ -536,10 +539,10 @@ class _SettingsTabState extends State<SettingsTab> {
                           HapticFeedback.selectionClick();
                           state.updateDailyBillsReminder(enabled: v);
                         },
-                        activeTrackColor: AppColors.indigoPrimary,
+                        activeTrackColor: AppColors.primary,
                         secondary: const Icon(
                           Icons.notifications_active_outlined,
-                          color: AppColors.indigoPrimary,
+                          color: AppColors.primary,
                           size: 20,
                         ),
                         title: const Text(

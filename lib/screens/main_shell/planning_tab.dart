@@ -99,7 +99,7 @@ class _PlanningTabState extends State<PlanningTab> {
                     if (ctx.mounted) Navigator.of(ctx).pop();
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.indigoPrimary,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 15),
@@ -206,7 +206,7 @@ class _PlanningTabState extends State<PlanningTab> {
                 const SizedBox(height: 12),
                 HigCurrencyHeroField(
                   controller: targetCtrl,
-                  label: 'Meta Final da Caixinha',
+                  label: 'Objetivo da Caixinha',
                   accentColor: AppColors.success(context),
                   autofocus: existing == null,
                 ),
@@ -252,7 +252,7 @@ class _PlanningTabState extends State<PlanningTab> {
                     const Divider(indent: 62, height: 1),
                     HigFormRow(
                       icon: Icons.account_balance_wallet_rounded,
-                      iconColor: AppColors.indigoPrimary,
+                      iconColor: AppColors.primary,
                       label: 'Já Guardado (R\$)',
                       trailing: SizedBox(
                         width: 130,
@@ -304,7 +304,7 @@ class _PlanningTabState extends State<PlanningTab> {
                       if (ctx.mounted) Navigator.of(ctx).pop();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.indigoPrimary,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 15),
@@ -453,7 +453,10 @@ class _PlanningTabState extends State<PlanningTab> {
           sliver: SliverToBoxAdapter(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
+                constraints: BoxConstraints(
+                  maxWidth:
+                      MediaQuery.sizeOf(context).width >= 840 ? 720 : 480,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -602,7 +605,7 @@ class _PlanningTabState extends State<PlanningTab> {
                                   fontSize: 12,
                                   color: limit > 0
                                       ? barColor
-                                      : AppColors.indigoPrimary,
+                                      : AppColors.primary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -647,7 +650,7 @@ class _PlanningTabState extends State<PlanningTab> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'MINHAS CAIXINHAS & METAS',
+              'MINHAS CAIXINHAS',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
