@@ -109,17 +109,21 @@ Future<void> showAccountModal({
                   ),
                   const SizedBox(height: 12),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(ctx).pop(),
                         child: const Text('Cancelar'),
                       ),
-                      Text(
-                        existing != null ? 'Editar Conta' : 'Nova Conta',
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Text(
+                          existing != null ? 'Editar Conta' : 'Nova Conta',
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       Row(
@@ -140,7 +144,7 @@ Future<void> showAccountModal({
                               },
                               icon: Icon(
                                 Icons.delete_outline_rounded,
-                                color: AppColors.danger(context),
+                                color: AppColors.danger(modalContext),
                               ),
                             ),
                           TextButton(
@@ -282,7 +286,7 @@ Future<void> showAccountModal({
                       const Divider(indent: 62, height: 1),
                       HigFormRow(
                         icon: Icons.pie_chart_rounded,
-                        iconColor: AppColors.success(context),
+                        iconColor: AppColors.success(modalContext),
                         label: 'Somar no Patrimônio',
                         subtitle: 'Inclui esta conta no cálculo de Net Worth',
                         trailing: Switch.adaptive(
@@ -417,19 +421,23 @@ Future<void> showCardModal({
                   ),
                   const SizedBox(height: 12),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(ctx).pop(),
                         child: const Text('Cancelar'),
                       ),
-                      Text(
-                        existing != null
-                            ? 'Editar Cartão'
-                            : 'Novo Cartão de Crédito',
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Text(
+                          existing != null
+                              ? 'Editar Cartão'
+                              : 'Novo Cartão de Crédito',
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       Row(
@@ -450,7 +458,7 @@ Future<void> showCardModal({
                               },
                               icon: Icon(
                                 Icons.delete_outline_rounded,
-                                color: AppColors.danger(context),
+                                color: AppColors.danger(modalContext),
                               ),
                             ),
                           TextButton(
@@ -556,7 +564,7 @@ Future<void> showCardModal({
                       const Divider(indent: 62, height: 1),
                       HigFormRow(
                         icon: Icons.event_busy_rounded,
-                        iconColor: AppColors.warning(context),
+                        iconColor: AppColors.warning(modalContext),
                         label: 'Dia de Fechamento',
                         subtitle:
                             'Compras a partir deste dia vão p/ próxima fatura',
@@ -584,7 +592,7 @@ Future<void> showCardModal({
                       const Divider(indent: 62, height: 1),
                       HigFormRow(
                         icon: Icons.event_available_rounded,
-                        iconColor: AppColors.success(context),
+                        iconColor: AppColors.success(modalContext),
                         label: 'Dia de Vencimento',
                         subtitle: 'Data limite para pagamento da fatura',
                         trailing: DropdownButton<int>(

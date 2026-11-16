@@ -365,4 +365,102 @@ date,category,title,amount
     expect(appState.getAccountById(account.id)!.currentBalance, 70.0);
     expect(appState.goalsTotalBalance, 35.0);
   });
+
+  testWidgets('Adicionar e editar cartão de crédito sem erro de _dependents.isEmpty',
+      (tester) async {
+    final appState = AppState();
+    await appState.init();
+
+    await tester.pumpWidget(NevesFinanceApp(appState: appState));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cartões'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cadastrar Primeiro Cartão'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Nubank'));
+    await tester.pumpAndSettle();
+
+    // Testa abrir dropdown de fechamento
+    await tester.tap(find.text('Dia 5'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dia 8').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Salvar'));
+    await tester.pumpAndSettle();
+
+    expect(appState.creditCards.length, 1);
+    expect(appState.creditCards.first.name, 'Nubank');
+    expect(appState.creditCards.first.closingDay, 8);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Adicionar Caixinha em Planejamento sem erro de assertion',
+      (tester) async {
+    final appState = AppState();
+    await appState.init();
+
+    await tester.pumpWidget(NevesFinanceApp(appState: appState));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Planejamento'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Caixinhas'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Nova Caixinha'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.bySemanticsLabel('Nome (ex: Reserva de Emergência, Viagem...)').first.evaluate().isEmpty
+          ? find.widgetWithText(TextField, '').last
+          : find.bySemanticsLabel('Nome (ex: Reserva de Emergência, Viagem...)'),
+      'Carro',
+    );
+    await tester.tap(find.text('Salvar Caixinha'));
+    await tester.pumpAndSettle();
+
+    expect(appState.goals.any((g) => g.name == 'Carro'), isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('ImportService preserva centavos com vírgula em TSV, CSV com aspas, CSV sem aspas e PDF', () async {
+    final appState = AppState();
+    await appState.init();
+
+    const mixedFormats = '''
+2026-11-15\tDl *Uberrides\t42,99
+2026-11-15,"Dl*Google Youtub","16,90"
+2026-11-14,Shopee *Insider,30,62
+15/11/2026;Posto Base;1.242,99
+14/11/2026 | Amazon | R\$ +89,55
+13/11/2026 Padaria Central 18,45
+''';
+
+    final parsed = ImportService.parseStatementContent(
+      content: mixedFormats,
+      extension: 'txt',
+      categories: appState.categories,
+      existingTransactions: appState.transactions,
+      forceExpenseForCreditCard: true,
+    );
+
+    expect(parsed.length, 6);
+    expect(parsed[0].title, 'Dl *Uberrides');
+    expect(parsed[0].amount, 42.99);
+    expect(parsed[1].title, 'Dl*Google Youtub');
+    expect(parsed[1].amount, 16.90);
+    expect(parsed[2].title, 'Shopee *Insider');
+    expect(parsed[2].amount, 30.62);
+    expect(parsed[3].title, 'Posto Base');
+    expect(parsed[3].amount, 1242.99);
+    expect(parsed[4].title, 'Amazon');
+    expect(parsed[4].amount, 89.55);
+    expect(parsed[5].title, 'Padaria Central');
+    expect(parsed[5].amount, 18.45);
+  });
 }

@@ -491,3 +491,35 @@ class AppTheme {
     );
   }
 }
+
+/// Garante que controllers criados para modais só sejam descartados após a
+/// desmontagem completa da árvore (depois da animação de saída da rota).
+class HigModalScope extends StatefulWidget {
+  final List<ChangeNotifier> disposables;
+  final Widget child;
+
+  const HigModalScope({
+    super.key,
+    required this.disposables,
+    required this.child,
+  });
+
+  @override
+  State<HigModalScope> createState() => _HigModalScopeState();
+}
+
+class _HigModalScopeState extends State<HigModalScope> {
+  @override
+  void dispose() {
+    final items = List<ChangeNotifier>.from(widget.disposables);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final item in items) {
+        item.dispose();
+      }
+    });
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}

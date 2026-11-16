@@ -33,15 +33,20 @@ class DashboardCardsSection extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'MEUS CARTÕES DE CRÉDITO',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.7,
-                color: AppColors.primary,
+            const Expanded(
+              child: Text(
+                'MEUS CARTÕES DE CRÉDITO',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.7,
+                  color: AppColors.primary,
+                ),
               ),
             ),
+            const SizedBox(width: 8),
             TextButton.icon(
               onPressed: onCreateCard,
               icon: const Icon(Icons.add_card_rounded, size: 18),
@@ -262,28 +267,31 @@ class _CreditCardItem extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Fatura de ${AppFormatters.monthLabel(ym)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextSecondary,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Fatura de ${AppFormatters.monthLabel(ym)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
+                        ),
                       ),
-                    ),
-                    Text(
-                      AppFormatters.currency(invTotal, discreet: discreet),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
+                      Text(
+                        AppFormatters.currency(invTotal, discreet: discreet),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                if (invTotal > 0 && invStatus != InvoiceStatus.paid)
+                if (invTotal > 0 && invStatus != InvoiceStatus.paid) ...[
+                  const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: onPayInvoice,
                     style: ElevatedButton.styleFrom(
@@ -294,6 +302,7 @@ class _CreditCardItem extends StatelessWidget {
                     icon: const Icon(Icons.check_rounded, size: 16),
                     label: const Text('Pagar Fatura'),
                   ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -311,16 +320,26 @@ class _CreditCardItem extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Ocupado: ${AppFormatters.currency(used, discreet: discreet)}',
-                  style: const TextStyle(fontSize: 12),
+                Flexible(
+                  child: Text(
+                    'Ocupado: ${AppFormatters.currency(used, discreet: discreet)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 ),
-                Text(
-                  'Disponível: ${AppFormatters.currency(avail, discreet: discreet)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.success(context),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Disponível: ${AppFormatters.currency(avail, discreet: discreet)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.success(context),
+                    ),
                   ),
                 ),
               ],

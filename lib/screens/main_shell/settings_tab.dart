@@ -58,7 +58,9 @@ class _SettingsTabState extends State<SettingsTab> {
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
-        return StatefulBuilder(
+        return HigModalScope(
+          disposables: [nameCtrl],
+          child: StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
               padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset + 24),
@@ -332,10 +334,10 @@ class _SettingsTabState extends State<SettingsTab> {
               ),
             );
           },
+        ),
         );
       },
     );
-    nameCtrl.dispose();
   }
 
   @override

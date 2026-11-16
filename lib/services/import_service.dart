@@ -313,34 +313,38 @@ class ImportService {
         continue;
       }
 
-      final sep = line.contains(';') ? ';' : ',';
-      final cols = line
-          .split(sep)
-          .map((c) => c.trim().replaceAll('"', ''))
-          .where((c) => c.isNotEmpty)
-          .toList();
-
+      final cols = _parseRowColumns(line);
       if (cols.length < 2) continue;
 
       DateTime? foundDate;
-      double? foundAmount;
-      final textParts = <String>[];
+      int? dateColIdx;
+      for (int i = 0; i < cols.length; i++) {
+        final dt = _tryParseDate(cols[i]);
+        if (dt != null) {
+          foundDate = dt;
+          dateColIdx = i;
+          break;
+        }
+      }
 
-      for (final col in cols) {
-        if (foundDate == null) {
-          final dt = _tryParseDate(col);
-          if (dt != null) {
-            foundDate = dt;
-            continue;
-          }
+      // Procura o valor monetário preferindo a coluna mais à direita
+      // (evita confundir códigos/números à esquerda com o valor)
+      double? foundAmount;
+      int? amountColIdx;
+      for (int i = cols.length - 1; i >= 0; i--) {
+        if (i == dateColIdx) continue;
+        final amt = _tryParseCurrency(cols[i]);
+        if (amt != null && amt != 0) {
+          foundAmount = amt;
+          amountColIdx = i;
+          break;
         }
-        if (foundAmount == null) {
-          final amt = _tryParseCurrency(col);
-          if (amt != null && amt != 0) {
-            foundAmount = amt;
-            continue;
-          }
-        }
+      }
+
+      final textParts = <String>[];
+      for (int i = 0; i < cols.length; i++) {
+        if (i == dateColIdx || i == amountColIdx) continue;
+        final col = cols[i];
         // Ignora coluna Identificador UUID do extrato da NuConta
         if (_uuidRegex.hasMatch(col)) {
           continue;
@@ -394,10 +398,105 @@ class ImportService {
     return results;
   }
 
+  static List<String> _parseRowColumns(String line) {
+    if (line.contains('\t')) {
+      final cols = line
+          .split('\t')
+          .map((c) => _stripSurroundingQuotes(c.trim()))
+          .where((c) => c.isNotEmpty)
+          .toList();
+      if (cols.length >= 2) return cols;
+    }
+
+    if (line.contains('|')) {
+      final cols = line
+          .split('|')
+          .map((c) => _stripSurroundingQuotes(c.trim()))
+          .where((c) => c.isNotEmpty)
+          .toList();
+      if (cols.length >= 2) return cols;
+    }
+
+    if (line.contains(';')) {
+      final cols = _splitCsvRespectingQuotes(line, ';')
+          .where((c) => c.isNotEmpty)
+          .toList();
+      if (cols.length >= 2) return cols;
+    }
+
+    // Linhas copiadas de PDF separadas por espaços: "15/11/2026 Loja 42,99"
+    // (checado antes da vírgula para não quebrar decimais como "18,45")
+    final pdfMatch = RegExp(
+      r'^(\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4})\s+(.+?)\s+([+-]?\s*(?:R\$\s*)?[\d.,]+)$',
+    ).firstMatch(line);
+    if (pdfMatch != null) {
+      return [
+        pdfMatch.group(1)!.trim(),
+        pdfMatch.group(2)!.trim(),
+        pdfMatch.group(3)!.trim(),
+      ];
+    }
+
+    if (line.contains(',')) {
+      var cols = _splitCsvRespectingQuotes(line, ',')
+          .where((c) => c.isNotEmpty)
+          .toList();
+      // Caso venha CSV sem aspas com decimal brasileiro no último campo (ex: 2026-11-15,Uber,42,99)
+      if (!line.contains('"') && cols.length >= 4) {
+        final whole = cols[cols.length - 2];
+        final cents = cols[cols.length - 1];
+        if (RegExp(r'^[+-]?(?:R\$\s*)?\d{1,3}(?:\.\d{3})*$|^[+-]?(?:R\$\s*)?\d+$')
+                .hasMatch(whole) &&
+            RegExp(r'^\d{2}$').hasMatch(cents)) {
+          cols = [
+            ...cols.sublist(0, cols.length - 2),
+            '$whole,$cents',
+          ];
+        }
+      }
+      return cols;
+    }
+
+    return const [];
+  }
+
+  static String _stripSurroundingQuotes(String value) {
+    if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+      return value.substring(1, value.length - 1).replaceAll('""', '"').trim();
+    }
+    return value.replaceAll('"', '').trim();
+  }
+
+  static List<String> _splitCsvRespectingQuotes(String line, String delimiter) {
+    final fields = <String>[];
+    final buf = StringBuffer();
+    bool inQuotes = false;
+
+    for (int i = 0; i < line.length; i++) {
+      final ch = line[i];
+      if (ch == '"') {
+        if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
+          buf.write('"');
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch == delimiter && !inQuotes) {
+        fields.add(buf.toString().trim());
+        buf.clear();
+      } else {
+        buf.write(ch);
+      }
+    }
+    fields.add(buf.toString().trim());
+    return fields;
+  }
+
   static DateTime? _tryParseDate(String raw) {
     final clean = raw.trim();
-    // YYYY-MM-DD
-    final isoMatch = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(clean);
+    // YYYY-MM-DD (standalone ou ISO timestamp YYYY-MM-DDTHH:mm...)
+    final isoMatch =
+        RegExp(r'^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$').firstMatch(clean);
     if (isoMatch != null) {
       return DateTime.tryParse(clean.substring(0, 10));
     }
@@ -414,7 +513,7 @@ class ImportService {
 
   static double? _tryParseCurrency(String raw) {
     var clean = raw.replaceAll('R\$', '').replaceAll(' ', '').trim();
-    if (!RegExp(r'^-?[\d.,]+$').hasMatch(clean)) return null;
+    if (!RegExp(r'^[+-]?[\d.,]+$').hasMatch(clean)) return null;
 
     if (clean.contains(',') && clean.contains('.')) {
       // Ex: 1.250,50 -> 1250.50

@@ -72,7 +72,9 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return StatefulBuilder(
+        return HigModalScope(
+          disposables: [controller],
+          child: StatefulBuilder(
           builder: (context, setModalState) {
             final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
             return Container(
@@ -247,10 +249,10 @@ class _GeminiConfigCardState extends State<GeminiConfigCard> {
               ),
             );
           },
+        ),
         );
       },
     );
-    controller.dispose();
   }
 
   @override

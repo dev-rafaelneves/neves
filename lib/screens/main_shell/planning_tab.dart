@@ -151,7 +151,9 @@ class _PlanningTabState extends State<PlanningTab> {
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
-        return StatefulBuilder(
+        return HigModalScope(
+          disposables: [nameCtrl, targetCtrl, currentCtrl],
+          child: StatefulBuilder(
           builder: (context, setModalState) => Container(
           padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset + 24),
           decoration: BoxDecoration(
@@ -369,12 +371,10 @@ class _PlanningTabState extends State<PlanningTab> {
             ),
           ),
         ),
+        ),
         );
       },
     );
-    nameCtrl.dispose();
-    targetCtrl.dispose();
-    currentCtrl.dispose();
   }
 
   Future<void> _showQuickDepositDialog(GoalModel goal) async {
@@ -391,7 +391,9 @@ class _PlanningTabState extends State<PlanningTab> {
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
-        return StatefulBuilder(
+        return HigModalScope(
+          disposables: [ctrl],
+          child: StatefulBuilder(
           builder: (context, setModalState) => Container(
             padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset + 24),
             decoration: BoxDecoration(
@@ -566,10 +568,10 @@ class _PlanningTabState extends State<PlanningTab> {
               ],
             ),
           ),
+        ),
         );
       },
     );
-    ctrl.dispose();
   }
 
   @override

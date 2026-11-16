@@ -28,7 +28,9 @@ class AppLockGate extends StatefulWidget {
     await showDialog<void>(
       context: context,
       builder: (ctx) {
-        return StatefulBuilder(
+        return HigModalScope(
+          disposables: [pinCtrl, confirmPinCtrl],
+          child: StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
@@ -228,12 +230,10 @@ class AppLockGate extends StatefulWidget {
               ],
             );
           },
+        ),
         );
       },
     );
-
-    pinCtrl.dispose();
-    confirmPinCtrl.dispose();
   }
 
   @override
