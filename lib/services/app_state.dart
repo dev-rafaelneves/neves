@@ -17,6 +17,8 @@ class AppState extends ChangeNotifier {
 
   ThemeMode _themeMode = ThemeMode.light;
   ThemeMode get themeMode => _themeMode;
+  final ValueNotifier<ThemeMode> themeModeNotifier =
+      ValueNotifier<ThemeMode>(ThemeMode.light);
 
   bool _discreetMode = false;
   bool get discreetMode => _discreetMode;
@@ -93,6 +95,7 @@ class AppState extends ChangeNotifier {
     // Carregar preferências
     final isDark = _prefs?.getBool('neves_dark_mode') ?? false;
     _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+    themeModeNotifier.value = _themeMode;
     _discreetMode = _prefs?.getBool('neves_discreet_mode') ?? false;
     _budgetRegime = BudgetRegime.fromString(
       _prefs?.getString('neves_budget_regime'),
@@ -177,7 +180,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _persistFallbackIfNeeded() async {
-    if (_prefs == null) return;
+    if (_prefs == null || DatabaseService.isAvailable) return;
     await _prefs!.setString(
       'neves_accounts',
       jsonEncode(_accounts.map((e) => e.toMap()).toList()),
@@ -404,6 +407,7 @@ class AppState extends ChangeNotifier {
   Future<void> toggleTheme() async {
     _themeMode =
         _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    themeModeNotifier.value = _themeMode;
     await _prefs?.setBool('neves_dark_mode', _themeMode == ThemeMode.dark);
     notifyListeners();
   }
@@ -600,18 +604,27 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Retorna o limite total ocupado no cartão por compras/parcelas ainda não pagas
+  /// Retorna o limite total ocupado no cartão por compras/parcelas ainda não pagas,
+  /// descontando eventuais adiantamentos/pagamentos parciais já vinculados à fatura.
   double getCardUsedLimit(String cardId) {
-    double used = 0.0;
+    final pendingByMonth = <String, double>{};
     for (final t in _transactions) {
       if (t.cardId == cardId &&
           !t.isIgnored &&
           !t.isInvoicePayment &&
           t.status == TransactionStatus.pending) {
-        used += t.type == TransactionType.income ? -t.amount : t.amount;
+        final signed =
+            t.type == TransactionType.income ? -t.amount : t.amount;
+        pendingByMonth[t.competenceMonth] =
+            (pendingByMonth[t.competenceMonth] ?? 0.0) + signed;
       }
     }
-    return used.clamp(0.0, double.infinity);
+    double used = 0.0;
+    for (final entry in pendingByMonth.entries) {
+      final paidOnMonth = getInvoicePaidAmount(cardId, entry.key);
+      used += (entry.value - paidOnMonth).clamp(0.0, double.infinity);
+    }
+    return used;
   }
 
   double getCardAvailableLimit(CreditCardModel card) {
@@ -644,10 +657,37 @@ class AppState extends ChangeNotifier {
     return total.clamp(0.0, double.infinity);
   }
 
+  /// Soma pagamentos parciais/antecipados já efetuados para esta fatura.
+  double getInvoicePaidAmount(String cardId, String yearMonth) {
+    return _transactions
+        .where(
+          (t) =>
+              t.cardId == cardId &&
+              t.competenceMonth == yearMonth &&
+              t.isInvoicePayment &&
+              !t.isIgnored &&
+              t.status == TransactionStatus.paid,
+        )
+        .fold(0.0, (sum, t) => sum + t.amount);
+  }
+
+  /// Valor ainda em aberto para quitação da fatura do cartão neste mês.
+  double getInvoiceRemaining(String cardId, String yearMonth) {
+    final txs = getInvoiceTransactions(cardId, yearMonth);
+    if (txs.isNotEmpty && txs.every((t) => t.status == TransactionStatus.paid)) {
+      return 0.0;
+    }
+    final remaining =
+        getInvoiceTotal(cardId, yearMonth) - getInvoicePaidAmount(cardId, yearMonth);
+    return remaining.clamp(0.0, double.infinity);
+  }
+
   InvoiceStatus getInvoiceStatus(CreditCardModel card, String yearMonth) {
     for (final inv in _invoices) {
-      if (inv.cardId == card.id && inv.yearMonth == yearMonth) {
-        return inv.status;
+      if (inv.cardId == card.id &&
+          inv.yearMonth == yearMonth &&
+          inv.status == InvoiceStatus.paid) {
+        return InvoiceStatus.paid;
       }
     }
     final txs = getInvoiceTransactions(card.id, yearMonth);
@@ -664,33 +704,26 @@ class AppState extends ChangeNotifier {
     return InvoiceStatus.open;
   }
 
-  /// Efetua o pagamento total ou parcial da fatura debitando de uma conta bancária
+  /// Efetua o pagamento total ou parcial da fatura debitando de uma conta bancária.
+  /// Pagamentos parciais mantêm a fatura em aberto exibindo apenas o saldo restante.
   Future<void> payCreditCardInvoice({
     required CreditCardModel card,
     required String yearMonth,
     required String sourceAccountId,
     double? customAmount,
   }) async {
-    final total = getInvoiceTotal(card.id, yearMonth);
-    final amountToPay = customAmount ?? total;
+    final remainingBefore = getInvoiceRemaining(card.id, yearMonth);
+    final amountToPay = customAmount ?? remainingBefore;
+    final isFullSettlement =
+        remainingBefore <= 0 || amountToPay >= remainingBefore - 0.009;
 
-    // 1. Marca as compras daquela fatura como pagas (liberando limite do cartão)
-    for (int i = 0; i < _transactions.length; i++) {
-      final t = _transactions[i];
-      if (t.cardId == card.id &&
-          t.competenceMonth == yearMonth &&
-          !t.isInvoicePayment) {
-        final updated = t.copyWith(status: TransactionStatus.paid);
-        _transactions[i] = updated;
-        await DatabaseService.saveTransaction(updated);
-      }
-    }
-
-    // 2. Cria uma transação de transferência/pagamento de fatura na conta corrente (não duplica despesa em categoria)
+    // 1. Cria transação de pagamento de fatura vinculada à conta e à competência
     if (amountToPay > 0) {
       final paymentTx = TransactionModel(
         id: _uuid.v4(),
-        title: 'Pagamento Fatura ${card.name} ($yearMonth)',
+        title: isFullSettlement
+            ? 'Pagamento Fatura ${card.name} ($yearMonth)'
+            : 'Pagamento Parcial Fatura ${card.name} ($yearMonth)',
         amount: amountToPay,
         type: TransactionType.transfer,
         date: DateTime.now(),
@@ -704,22 +737,39 @@ class AppState extends ChangeNotifier {
       await DatabaseService.saveTransaction(paymentTx);
     }
 
-    // 3. Registra a fatura como paga
-    final inv = CreditCardInvoice(
-      id: 'inv_${card.id}_$yearMonth',
-      cardId: card.id,
-      yearMonth: yearMonth,
-      status: InvoiceStatus.paid,
-      paidAmount: amountToPay,
-      paidAt: DateTime.now(),
-    );
-    final idx = _invoices.indexWhere((i) => i.id == inv.id);
-    if (idx >= 0) {
-      _invoices[idx] = inv;
-    } else {
-      _invoices.add(inv);
+    // 2. Só marca as compras da fatura como pagas quando o saldo é quitado integralmente
+    if (isFullSettlement) {
+      final updatedTxs = <TransactionModel>[];
+      for (int i = 0; i < _transactions.length; i++) {
+        final t = _transactions[i];
+        if (t.cardId == card.id &&
+            t.competenceMonth == yearMonth &&
+            !t.isInvoicePayment &&
+            t.status != TransactionStatus.paid) {
+          final updated = t.copyWith(status: TransactionStatus.paid);
+          _transactions[i] = updated;
+          updatedTxs.add(updated);
+        }
+      }
+      await DatabaseService.saveTransactionsBatch(updatedTxs);
+
+      final totalPaid = getInvoicePaidAmount(card.id, yearMonth);
+      final inv = CreditCardInvoice(
+        id: 'inv_${card.id}_$yearMonth',
+        cardId: card.id,
+        yearMonth: yearMonth,
+        status: InvoiceStatus.paid,
+        paidAmount: totalPaid > 0 ? totalPaid : amountToPay,
+        paidAt: DateTime.now(),
+      );
+      final idx = _invoices.indexWhere((i) => i.id == inv.id);
+      if (idx >= 0) {
+        _invoices[idx] = inv;
+      } else {
+        _invoices.add(inv);
+      }
+      await DatabaseService.saveInvoice(inv);
     }
-    await DatabaseService.saveInvoice(inv);
 
     await _recalculateAccountBalances();
     await _persistFallbackIfNeeded();
@@ -832,13 +882,35 @@ class AppState extends ChangeNotifier {
     await _persistFallbackIfNeeded();
 
     // Verifica limite de orçamento para alertar 80% / 100%
-    if (baseTx.type == TransactionType.expense && baseTx.categoryId != null) {
+    if (baseTx.type == TransactionType.expense &&
+        !baseTx.isIgnored &&
+        !baseTx.isThirdParty &&
+        baseTx.categoryId != null) {
       await _checkBudgetThresholdAlert(
         baseTx.categoryId!,
         baseTx.effectiveMonth(_budgetRegime),
       );
     }
 
+    notifyListeners();
+  }
+
+  /// Insere um lote de transações em operação única (evita N recálculos e N gravações).
+  Future<void> addTransactionsBatch(List<TransactionModel> txs) async {
+    if (txs.isEmpty) return;
+    for (final tx in txs) {
+      final existingIdx = _transactions.indexWhere((t) => t.id == tx.id);
+      if (existingIdx >= 0) {
+        _transactions[existingIdx] = tx;
+      } else {
+        _transactions.insert(0, tx);
+      }
+    }
+    await DatabaseService.saveTransactionsBatch(txs);
+    _transactions.sort((a, b) => b.date.compareTo(a.date));
+    await _recalculateGoals();
+    await _recalculateAccountBalances();
+    await _persistFallbackIfNeeded();
     notifyListeners();
   }
 
@@ -896,6 +968,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _recalculateAccountBalances() async {
+    final changedAccounts = <Account>[];
     for (int i = 0; i < _accounts.length; i++) {
       final acc = _accounts[i];
       double bal = acc.initialBalance;
@@ -916,26 +989,30 @@ class AppState extends ChangeNotifier {
         }
       }
 
-      final updated = acc.copyWith(currentBalance: bal);
-      _accounts[i] = updated;
-      await DatabaseService.saveAccount(updated);
+      if ((acc.currentBalance - bal).abs() > 0.0001) {
+        final updated = acc.copyWith(currentBalance: bal);
+        _accounts[i] = updated;
+        changedAccounts.add(updated);
+      }
     }
+    await DatabaseService.saveAccountsBatch(changedAccounts);
   }
 
   Future<void> _recalculateGoals() async {
+    final changedGoals = <GoalModel>[];
     for (int i = 0; i < _goals.length; i++) {
       final g = _goals[i];
-      double sum = 0.0;
-      bool hasLinkedTx = false;
+      double sum = g.initialBalance;
       for (final t in _transactions) {
         if (t.goalId == g.id &&
             !t.isIgnored &&
             t.status == TransactionStatus.paid) {
-          hasLinkedTx = true;
+          final isContribution = t.tags.contains('cofrinho_aporte') ||
+              t.tags.contains('rendimento_cofrinho') ||
+              t.categoryId == 'cat_rendimentos';
           final isWithdrawal = t.tags.contains('resgate_cofrinho') ||
-              (t.type == TransactionType.income &&
-                  t.categoryId != 'cat_rendimentos' &&
-                  !t.tags.contains('rendimento_cofrinho'));
+              (t.type == TransactionType.expense && !isContribution) ||
+              (t.type == TransactionType.income && !isContribution);
           if (isWithdrawal) {
             sum -= t.amount;
           } else {
@@ -943,14 +1020,14 @@ class AppState extends ChangeNotifier {
           }
         }
       }
-      if (hasLinkedTx) {
-        final updated = g.copyWith(
-          currentAmount: sum.clamp(0.0, double.infinity),
-        );
+      final clamped = sum.clamp(0.0, double.infinity);
+      if ((g.currentAmount - clamped).abs() > 0.0001) {
+        final updated = g.copyWith(currentAmount: clamped);
         _goals[i] = updated;
-        await DatabaseService.saveGoal(updated);
+        changedGoals.add(updated);
       }
     }
+    await DatabaseService.saveGoalsBatch(changedGoals);
   }
 
   // --- Orçamentos (Budgets) e Metas (Goals) ---
@@ -1027,6 +1104,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> addContributionToGoal(GoalModel goal, double delta) async {
     final updated = goal.copyWith(
+      initialBalance: (goal.initialBalance + delta).clamp(0.0, double.infinity),
       currentAmount: (goal.currentAmount + delta).clamp(0.0, double.infinity),
     );
     await saveGoal(updated);
@@ -1057,6 +1135,7 @@ class AppState extends ChangeNotifier {
         .where((t) =>
             t.type == TransactionType.income &&
             !t.isCreditCard &&
+            !t.isThirdParty &&
             !t.tags.contains('resgate_cofrinho') &&
             (!onlyPaid || t.status == TransactionStatus.paid))
         .fold(0.0, (s, t) => s + t.amount);
@@ -1067,6 +1146,7 @@ class AppState extends ChangeNotifier {
         .where((t) =>
             t.type == TransactionType.expense &&
             !t.isInvoicePayment &&
+            !t.isThirdParty &&
             !t.tags.contains('cofrinho_aporte') &&
             (!onlyPaid ||
                 t.status == TransactionStatus.paid ||
@@ -1103,7 +1183,7 @@ class AppState extends ChangeNotifier {
     return assets + goalsTotalBalance - totalCreditCardUnpaidDebt;
   }
 
-  /// Saldo Projetado no Fim do Mês = Saldo Atual em Contas Líquidas + Receitas Pendentes do Mês - Despesas Pendentes do Mês - Faturas de Cartão do Mês não pagas
+  /// Saldo Projetado no Fim do Mês = Saldo Atual em Contas Líquidas + Receitas Pendentes do Mês - Despesas Pendentes do Mês - Saldo Restante de Faturas de Cartão do Mês
   double projectedEndOfMonthBalance(String yearMonth) {
     final monthTxs = transactionsForMonth(yearMonth);
     final pendingCashExpense = monthTxs
@@ -1122,21 +1202,9 @@ class AppState extends ChangeNotifier {
             t.status == TransactionStatus.pending)
         .fold(0.0, (s, t) => s + t.amount);
 
-    final unpaidCardByCard = <String, double>{};
-    for (final t in _transactions) {
-      if (t.isCreditCard &&
-          !t.isIgnored &&
-          !t.isInvoicePayment &&
-          t.competenceMonth == yearMonth &&
-          t.status == TransactionStatus.pending) {
-        final cId = t.cardId!;
-        final signed =
-            t.type == TransactionType.income ? -t.amount : t.amount;
-        unpaidCardByCard[cId] = (unpaidCardByCard[cId] ?? 0.0) + signed;
-      }
-    }
-    final unpaidCardInvoicesThisMonth = unpaidCardByCard.values
-        .fold(0.0, (s, v) => s + v.clamp(0.0, double.infinity));
+    final unpaidCardInvoicesThisMonth = _creditCards
+        .where((c) => !c.archived)
+        .fold(0.0, (s, c) => s + getInvoiceRemaining(c.id, yearMonth));
 
     return liquidAccountsBalance +
         pendingIncomeFiltered -
@@ -1149,6 +1217,7 @@ class AppState extends ChangeNotifier {
         .where((t) =>
             t.type == TransactionType.expense &&
             !t.isInvoicePayment &&
+            !t.isThirdParty &&
             !t.tags.contains('cofrinho_aporte') &&
             t.categoryId == categoryId)
         .fold(0.0, (s, t) => s + t.amount);
@@ -1292,8 +1361,43 @@ class AppState extends ChangeNotifier {
 
     _transactions.sort((a, b) => b.date.compareTo(a.date));
     await _ensureSeeds();
+    await _recalculateGoals();
     await _recalculateAccountBalances();
     await _persistFallbackIfNeeded();
     notifyListeners();
+  }
+
+  /// Gera backup de segurança automático e reinicia a carteira para o estado inicial.
+  Future<void> resetWalletToDefaults() async {
+    await BackupService.instance.generateLocalBackup(this);
+    await DatabaseService.clearAllData();
+    _accounts.clear();
+    _creditCards.clear();
+    _invoices.clear();
+    _categories.clear();
+    _transactions.clear();
+    _budgets.clear();
+    _goals.clear();
+    if (_prefs != null) {
+      for (final key in [
+        'neves_accounts',
+        'neves_cards',
+        'neves_invoices',
+        'neves_categories',
+        'neves_transactions',
+        'neves_budgets',
+        'neves_goals',
+      ]) {
+        await _prefs!.remove(key);
+      }
+    }
+    await _ensureSeeds();
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    themeModeNotifier.dispose();
+    super.dispose();
   }
 }

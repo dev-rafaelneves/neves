@@ -24,7 +24,7 @@ class NevesFinanceApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: appState,
+      listenable: appState.themeModeNotifier,
       builder: (context, _) {
         return MaterialApp(
           title: 'Neves Finanças',

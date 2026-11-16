@@ -31,8 +31,11 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isWide = MediaQuery.sizeOf(context).width >= 840;
+    return ListenableBuilder(
+      listenable: widget.appState,
+      builder: (context, _) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final isWide = MediaQuery.sizeOf(context).width >= 840;
 
     final bodyStack = IndexedStack(
       index: _selectedIndex,
@@ -245,6 +248,8 @@ class _MainShellState extends State<MainShell> {
                 ),
               ),
       ),
+    );
+      },
     );
   }
 }

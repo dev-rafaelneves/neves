@@ -336,11 +336,17 @@ class _PlanningTabState extends State<PlanningTab> {
                       final current = CentavosCurrencyFormatter.parseValue(
                         currentCtrl.text,
                       );
+                      final nextInitial = existing != null
+                          ? (existing.initialBalance +
+                                  (current - existing.currentAmount))
+                              .clamp(0.0, double.infinity)
+                          : current;
                       await widget.appState.saveGoal(
                         GoalModel(
                           id: existing?.id ?? _uuid.v4(),
                           name: name,
                           targetAmount: target > 0 ? target : 1000.0,
+                          initialBalance: nextInitial,
                           currentAmount: current,
                           colorValue: existing?.colorValue ?? 0xFF10B981,
                           iconName: existing?.iconName ?? 'savings',

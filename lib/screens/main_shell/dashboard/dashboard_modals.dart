@@ -684,7 +684,7 @@ Future<void> showPayInvoiceDialog({
   required CreditCardModel card,
 }) async {
   final ym = appState.selectedYearMonth;
-  final total = appState.getInvoiceTotal(card.id, ym);
+  final total = appState.getInvoiceRemaining(card.id, ym);
   final amountCtrl = TextEditingController(
     text: CentavosCurrencyFormatter.formatDouble(total),
   );

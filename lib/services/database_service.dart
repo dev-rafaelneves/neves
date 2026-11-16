@@ -28,8 +28,11 @@ class DatabaseService {
 
       _database = await openDatabase(
         path,
-        version: 1,
+        version: 2,
         onCreate: _onCreate,
+        onUpgrade: (db, oldVersion, newVersion) async {
+          await _ensureTables(db);
+        },
         onOpen: (db) async {
           await _ensureTables(db);
         },
@@ -116,15 +119,21 @@ class DatabaseService {
         notes TEXT,
         import_hash TEXT,
         is_invoice_payment INTEGER NOT NULL DEFAULT 0,
-        is_ignored INTEGER NOT NULL DEFAULT 0
+        is_ignored INTEGER NOT NULL DEFAULT 0,
+        is_third_party INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
-    // Migração: adiciona is_ignored em bancos já existentes.
+    // Migração: adiciona colunas novas em bancos já existentes.
     final txCols = await db.rawQuery('PRAGMA table_info(transactions)');
     if (!txCols.any((c) => c['name'] == 'is_ignored')) {
       await db.execute(
         'ALTER TABLE transactions ADD COLUMN is_ignored INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (!txCols.any((c) => c['name'] == 'is_third_party')) {
+      await db.execute(
+        'ALTER TABLE transactions ADD COLUMN is_third_party INTEGER NOT NULL DEFAULT 0',
       );
     }
 
@@ -142,12 +151,20 @@ class DatabaseService {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         target_amount REAL NOT NULL,
+        initial_balance REAL NOT NULL DEFAULT 0,
         current_amount REAL NOT NULL,
         target_date_iso TEXT,
         color_value INTEGER NOT NULL,
         icon_name TEXT NOT NULL
       )
     ''');
+
+    final goalCols = await db.rawQuery('PRAGMA table_info(goals)');
+    if (!goalCols.any((c) => c['name'] == 'initial_balance')) {
+      await db.execute(
+        'ALTER TABLE goals ADD COLUMN initial_balance REAL NOT NULL DEFAULT 0',
+      );
+    }
 
     await db.execute('''
       CREATE TABLE IF NOT EXISTS ai_insights (
@@ -179,6 +196,21 @@ class DatabaseService {
         account.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+    } catch (_) {}
+  }
+
+  static Future<void> saveAccountsBatch(List<Account> accounts) async {
+    if (!isAvailable || accounts.isEmpty) return;
+    try {
+      final batch = _database!.batch();
+      for (final account in accounts) {
+        batch.insert(
+          'accounts',
+          account.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
     } catch (_) {}
   }
 
@@ -294,6 +326,21 @@ class DatabaseService {
     } catch (_) {}
   }
 
+  static Future<void> saveTransactionsBatch(List<TransactionModel> txs) async {
+    if (!isAvailable || txs.isEmpty) return;
+    try {
+      final batch = _database!.batch();
+      for (final tx in txs) {
+        batch.insert(
+          'transactions',
+          tx.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    } catch (_) {}
+  }
+
   static Future<void> deleteTransaction(String id) async {
     if (!isAvailable) return;
     try {
@@ -360,6 +407,21 @@ class DatabaseService {
         goal.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+    } catch (_) {}
+  }
+
+  static Future<void> saveGoalsBatch(List<GoalModel> goals) async {
+    if (!isAvailable || goals.isEmpty) return;
+    try {
+      final batch = _database!.batch();
+      for (final goal in goals) {
+        batch.insert(
+          'goals',
+          goal.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
     } catch (_) {}
   }
 

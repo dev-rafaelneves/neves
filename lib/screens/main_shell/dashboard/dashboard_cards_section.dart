@@ -177,6 +177,8 @@ class _CreditCardItem extends StatelessWidget {
     final used = appState.getCardUsedLimit(card.id);
     final avail = appState.getCardAvailableLimit(card);
     final invTotal = appState.getInvoiceTotal(card.id, ym);
+    final invPaid = appState.getInvoicePaidAmount(card.id, ym);
+    final invRemaining = appState.getInvoiceRemaining(card.id, ym);
     final invStatus = appState.getInvoiceStatus(card, ym);
     final usageRatio =
         card.creditLimit > 0 ? (used / card.creditLimit).clamp(0.0, 1.0) : 0.0;
@@ -272,7 +274,9 @@ class _CreditCardItem extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Fatura de ${AppFormatters.monthLabel(ym)}',
+                        invPaid > 0 && invRemaining > 0
+                            ? 'Restante ${AppFormatters.monthLabel(ym)}'
+                            : 'Fatura de ${AppFormatters.monthLabel(ym)}',
                         style: TextStyle(
                           fontSize: 12,
                           color: isDark
@@ -281,16 +285,30 @@ class _CreditCardItem extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        AppFormatters.currency(invTotal, discreet: discreet),
+                        AppFormatters.currency(
+                          invStatus == InvoiceStatus.paid
+                              ? invTotal
+                              : invRemaining,
+                          discreet: discreet,
+                        ),
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
+                      if (invPaid > 0 && invStatus != InvoiceStatus.paid)
+                        Text(
+                          'Já pago/antecipado: ${AppFormatters.currency(invPaid, discreet: discreet)} de ${AppFormatters.currency(invTotal, discreet: discreet)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.success(context),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                if (invTotal > 0 && invStatus != InvoiceStatus.paid) ...[
+                if (invRemaining > 0 && invStatus != InvoiceStatus.paid) ...[
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: onPayInvoice,

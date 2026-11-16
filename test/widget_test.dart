@@ -463,4 +463,128 @@ date,category,title,amount
     expect(parsed[5].title, 'Padaria Central');
     expect(parsed[5].amount, 18.45);
   });
+
+  test(
+      'Etapa 1: Caixinha preserva initialBalance, Terceiro entra na fatura sem inflar gastos e pagamento parcial abate restante',
+      () async {
+    final appState = AppState();
+    await appState.init();
+
+    const account = Account(
+      id: 'acc_mp',
+      name: 'Mercado Pago',
+      type: AccountType.checking,
+      initialBalance: 2000.0,
+      currentBalance: 2000.0,
+      colorValue: 0xFF059669,
+      iconName: 'account_balance',
+    );
+    await appState.saveAccount(account);
+
+    const card = CreditCardModel(
+      id: 'card_mp',
+      name: 'Mercado Pago',
+      creditLimit: 5000.0,
+      closingDay: 28,
+      dueDay: 4,
+      colorValue: 0xFF059669,
+    );
+    await appState.saveCreditCard(card);
+
+    // 1. Caixinha criada com saldo inicial R$ 2.175,41 + lote com rendimento + despesa paga direto da caixinha
+    const goal = GoalModel(
+      id: 'goal_sal',
+      name: 'Salário',
+      targetAmount: 5000.0,
+      initialBalance: 2175.41,
+      currentAmount: 2175.41,
+      colorValue: 0xFF10B981,
+      iconName: 'savings',
+    );
+    await appState.saveGoal(goal);
+
+    await appState.addTransactionsBatch([
+      TransactionModel(
+        id: 't_yield',
+        title: 'Rendimento',
+        amount: 10.0,
+        type: TransactionType.income,
+        date: DateTime(2026, 11, 5),
+        competenceMonth: '2026-11',
+        status: TransactionStatus.paid,
+        categoryId: 'cat_rendimentos',
+        goalId: goal.id,
+        tags: const ['rendimento_cofrinho'],
+      ),
+      TransactionModel(
+        id: 't_direct_boleto',
+        title: 'Condomínio direto Caixinha',
+        amount: 172.0,
+        type: TransactionType.expense,
+        date: DateTime(2026, 11, 4),
+        competenceMonth: '2026-11',
+        status: TransactionStatus.paid,
+        accountId: null,
+        categoryId: 'cat_moradia',
+        goalId: goal.id,
+      ),
+      TransactionModel(
+        id: 't_card_mine',
+        title: 'Compra Minha',
+        amount: 1000.0,
+        type: TransactionType.expense,
+        date: DateTime(2026, 11, 6),
+        competenceMonth: '2026-11',
+        status: TransactionStatus.pending,
+        cardId: card.id,
+        categoryId: 'cat_compras',
+      ),
+      TransactionModel(
+        id: 't_card_third',
+        title: 'Compra Terceiro',
+        amount: 720.28,
+        type: TransactionType.expense,
+        date: DateTime(2026, 11, 7),
+        competenceMonth: '2026-11',
+        status: TransactionStatus.pending,
+        cardId: card.id,
+        categoryId: 'cat_compras',
+        isThirdParty: true,
+      ),
+    ]);
+
+    // initialBalance preservado: 2175.41 + 10.0 - 172.0 = 2013.41
+    expect(appState.goalsTotalBalance, closeTo(2013.41, 0.01));
+    // Conta não foi afetada pelo boleto pago direto da caixinha
+    expect(appState.getAccountById(account.id)!.currentBalance, 2000.0);
+    // Fatura real do banco inclui compra de terceiro (1720.28), mas despesa pessoal exclui terceiro (172 + 1000 = 1172)
+    expect(appState.getInvoiceTotal(card.id, '2026-11'), closeTo(1720.28, 0.01));
+    expect(appState.totalExpenseForMonth('2026-11'), closeTo(1172.0, 0.01));
+
+    // Pagamento parcial antecipado de R$ 680,41 mantém fatura aberta com restante R$ 1.039,87
+    await appState.payCreditCardInvoice(
+      card: card,
+      yearMonth: '2026-11',
+      sourceAccountId: account.id,
+      customAmount: 680.41,
+    );
+
+    expect(
+      appState.getInvoicePaidAmount(card.id, '2026-11'),
+      closeTo(680.41, 0.01),
+    );
+    expect(
+      appState.getInvoiceRemaining(card.id, '2026-11'),
+      closeTo(1039.87, 0.01),
+    );
+    expect(appState.getCardUsedLimit(card.id), closeTo(1039.87, 0.01));
+    expect(
+      appState.getAccountById(account.id)!.currentBalance,
+      closeTo(2000.0 - 680.41, 0.01),
+    );
+    expect(
+      appState.getInvoiceStatus(card, '2026-11'),
+      isNot(InvoiceStatus.paid),
+    );
+  });
 }

@@ -560,6 +560,8 @@ Regras obrigatórias:
       _selectedGoalId = defaultGoal.id;
     }
 
+    final batch = <TransactionModel>[];
+
     for (final item in selected) {
       final compMonth = card != null
           ? card.computeCompetenceMonth(item.date)
@@ -601,22 +603,24 @@ Regras obrigatórias:
             break;
         }
 
-        final tx = TransactionModel(
-          id: _uuid.v4(),
-          title: item.title,
-          amount: item.amount,
-          type: txType,
-          date: item.date,
-          competenceMonth: compMonth,
-          status: TransactionStatus.paid,
-          accountId: txAccountId,
-          categoryId: txCategoryId,
-          goalId: goalId,
-          tags: txTags,
-          importHash: item.importHash,
-          isIgnored: item.ignored,
+        batch.add(
+          TransactionModel(
+            id: _uuid.v4(),
+            title: item.title,
+            amount: item.amount,
+            type: txType,
+            date: item.date,
+            competenceMonth: compMonth,
+            status: TransactionStatus.paid,
+            accountId: txAccountId,
+            categoryId: txCategoryId,
+            goalId: goalId,
+            tags: txTags,
+            importHash: item.importHash,
+            isIgnored: item.ignored,
+            isThirdParty: item.isThirdParty,
+          ),
         );
-        await state.addOrUpdateTransaction(tx);
       } else if (_targetMode == ImportTargetMode.transfer) {
         final otherAccId = item.counterpartAccountId ??
             _selectedCounterpartAccountId ??
@@ -626,40 +630,46 @@ Regras obrigatórias:
         final destAccId =
             item.isOutgoingTransfer ? otherAccId : _selectedAccountId;
 
-        final tx = TransactionModel(
-          id: _uuid.v4(),
-          title: item.title,
-          amount: item.amount,
-          type: TransactionType.transfer,
-          date: item.date,
-          competenceMonth: compMonth,
-          status: TransactionStatus.paid,
-          accountId: sourceAccId,
-          destinationAccountId: destAccId,
-          importHash: item.importHash,
-          isIgnored: item.ignored,
+        batch.add(
+          TransactionModel(
+            id: _uuid.v4(),
+            title: item.title,
+            amount: item.amount,
+            type: TransactionType.transfer,
+            date: item.date,
+            competenceMonth: compMonth,
+            status: TransactionStatus.paid,
+            accountId: sourceAccId,
+            destinationAccountId: destAccId,
+            importHash: item.importHash,
+            isIgnored: item.ignored,
+            isThirdParty: item.isThirdParty,
+          ),
         );
-        await state.addOrUpdateTransaction(tx);
       } else {
-        final tx = TransactionModel(
-          id: _uuid.v4(),
-          title: item.title,
-          amount: item.amount,
-          type: item.type,
-          date: item.date,
-          competenceMonth: compMonth,
-          status: _importToCard
-              ? TransactionStatus.pending
-              : TransactionStatus.paid,
-          accountId: _importToCard ? null : _selectedAccountId,
-          cardId: _importToCard ? _selectedCardId : null,
-          categoryId: item.suggestedCategoryId,
-          importHash: item.importHash,
-          isIgnored: item.ignored,
+        batch.add(
+          TransactionModel(
+            id: _uuid.v4(),
+            title: item.title,
+            amount: item.amount,
+            type: item.type,
+            date: item.date,
+            competenceMonth: compMonth,
+            status: _importToCard
+                ? TransactionStatus.pending
+                : TransactionStatus.paid,
+            accountId: _importToCard ? null : _selectedAccountId,
+            cardId: _importToCard ? _selectedCardId : null,
+            categoryId: item.suggestedCategoryId,
+            importHash: item.importHash,
+            isIgnored: item.ignored,
+            isThirdParty: item.isThirdParty,
+          ),
         );
-        await state.addOrUpdateTransaction(tx);
       }
     }
+
+    await state.addTransactionsBatch(batch);
 
     if (mounted) {
       HapticFeedback.mediumImpact();
@@ -1325,8 +1335,14 @@ Regras obrigatórias:
                           _selectedCounterpartAccountId,
                       onToggleSelected: (v) => setState(() => c.selected = v),
                       onToggleType: () => _toggleSingleCandidateType(c),
-                      onToggleIgnored: () =>
-                          setState(() => c.ignored = !c.ignored),
+                      onToggleIgnored: () => setState(() {
+                        c.ignored = !c.ignored;
+                        if (c.ignored) c.isThirdParty = false;
+                      }),
+                      onToggleThirdParty: () => setState(() {
+                        c.isThirdParty = !c.isThirdParty;
+                        if (c.isThirdParty) c.ignored = false;
+                      }),
                       onChanged: () => setState(() {}),
                     ),
                   ),

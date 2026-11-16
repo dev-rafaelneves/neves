@@ -14,6 +14,7 @@ class ImportCandidateCard extends StatelessWidget {
   final ValueChanged<bool> onToggleSelected;
   final VoidCallback onToggleType;
   final VoidCallback onToggleIgnored;
+  final VoidCallback? onToggleThirdParty;
   final VoidCallback onChanged;
 
   const ImportCandidateCard({
@@ -28,6 +29,7 @@ class ImportCandidateCard extends StatelessWidget {
     required this.onToggleSelected,
     required this.onToggleType,
     required this.onToggleIgnored,
+    this.onToggleThirdParty,
     required this.onChanged,
   });
 
@@ -149,28 +151,56 @@ class ImportCandidateCard extends StatelessWidget {
               ),
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: onToggleIgnored,
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    foregroundColor:
-                        c.ignored ? AppColors.warning(context) : null,
-                  ),
-                  icon: Icon(
-                    c.ignored
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_outlined,
-                    size: 16,
-                  ),
-                  label: Text(
-                    c.ignored
-                        ? 'Ignorada (não conta em nada)'
-                        : 'Ignorar (não é minha)',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                child: Wrap(
+                  spacing: 4,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    if (onToggleThirdParty != null)
+                      TextButton.icon(
+                        onPressed: onToggleThirdParty,
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          foregroundColor:
+                              c.isThirdParty ? AppColors.primary : null,
+                        ),
+                        icon: Icon(
+                          c.isThirdParty
+                              ? Icons.person_rounded
+                              : Icons.person_outline_rounded,
+                          size: 16,
+                        ),
+                        label: Text(
+                          c.isThirdParty
+                              ? 'Terceiro (só fatura/conta)'
+                              : 'Não é minha',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    TextButton.icon(
+                      onPressed: onToggleIgnored,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor:
+                            c.ignored ? AppColors.warning(context) : null,
+                      ),
+                      icon: Icon(
+                        c.ignored
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_outlined,
+                        size: 16,
+                      ),
+                      label: Text(
+                        c.ignored ? 'Ignorada (oculta)' : 'Ignorar (duplicata)',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
               if (c.isDuplicate)

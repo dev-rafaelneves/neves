@@ -249,8 +249,9 @@ class BackupService {
       final installmentInfo =
           t.isInstallment ? ' (${t.installmentIndex}/${t.installmentTotal})' : '';
       final invoicePayTag = t.isInvoicePayment ? ' [PAG. FATURA]' : '';
+      final thirdPartyTag = t.isThirdParty ? ' [TERCEIRO]' : '';
       buf.writeln(
-        '${dateFmt.format(t.date)} | ${t.competenceMonth} | ${t.type.label} | $accName | $destName | $catName | ${t.status.label} | ${t.isIgnored ? 'SIM' : 'NÃO'} | ${money.format(t.amount)} | ${t.title}$installmentInfo$invoicePayTag',
+        '${dateFmt.format(t.date)} | ${t.competenceMonth} | ${t.type.label} | $accName | $destName | $catName | ${t.status.label} | ${t.isIgnored ? 'SIM' : 'NÃO'} | ${money.format(t.amount)} | ${t.title}$installmentInfo$invoicePayTag$thirdPartyTag',
       );
     }
 

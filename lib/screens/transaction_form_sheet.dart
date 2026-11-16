@@ -57,6 +57,8 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
 
   bool _useCreditCard = false;
   bool _isIgnored = false;
+  bool _isThirdParty = false;
+  bool _payDirectlyFromGoal = false;
   bool _showMoreOptions = false;
   String? _errorMessage;
   String? _selectedAccountId;
@@ -87,6 +89,12 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
 
     _useCreditCard = tx?.isCreditCard ?? false;
     _isIgnored = tx?.isIgnored ?? false;
+    _isThirdParty = tx?.isThirdParty ?? false;
+    _payDirectlyFromGoal = tx != null &&
+        tx.goalId != null &&
+        !tx.isCreditCard &&
+        tx.accountId == null &&
+        tx.type == TransactionType.expense;
     _selectedAccountId = tx?.accountId ??
         (state.accounts.isNotEmpty ? state.accounts.first.id : null);
     _destinationAccountId = tx?.destinationAccountId ??
@@ -102,6 +110,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
     _tags = List<String>.from(tx?.tags ?? []);
     _showMoreOptions = tx != null &&
         (tx.isIgnored ||
+            tx.isThirdParty ||
             tx.goalId != null ||
             tx.tags.isNotEmpty ||
             tx.recurrenceRule != RecurrenceRule.none ||
@@ -462,7 +471,12 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
       date: _selectedDate,
       competenceMonth: competenceMonth,
       status: _useCreditCard ? TransactionStatus.pending : _status,
-      accountId: _useCreditCard ? null : _selectedAccountId,
+      accountId: (_useCreditCard ||
+              (_payDirectlyFromGoal &&
+                  _selectedGoalId != null &&
+                  _type == TransactionType.expense))
+          ? null
+          : _selectedAccountId,
       destinationAccountId:
           _type == TransactionType.transfer ? _destinationAccountId : null,
       cardId: _useCreditCard ? _selectedCardId : null,
@@ -477,6 +491,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
       recurrenceRule: _recurrence,
       tags: _tags,
       isIgnored: _isIgnored,
+      isThirdParty: _isThirdParty,
     );
 
     await state.addOrUpdateTransaction(
@@ -1231,22 +1246,62 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                                       ),
                                     ),
                                   ],
-                                  onChanged: (v) =>
-                                      setState(() => _selectedGoalId = v),
+                                  onChanged: (v) => setState(() {
+                                    _selectedGoalId = v;
+                                    if (v == null) _payDirectlyFromGoal = false;
+                                  }),
                                 ),
                               ),
                             ),
+                            if (_selectedGoalId != null &&
+                                !_useCreditCard &&
+                                _type == TransactionType.expense) ...[
+                              const Divider(indent: 62, height: 1),
+                              HigFormRow(
+                                icon: Icons.account_balance_wallet_outlined,
+                                iconColor: AppColors.primary,
+                                label: 'Debitar direto da Caixinha',
+                                subtitle:
+                                    'Paga direto da reserva sem sair da conta',
+                                trailing: Switch.adaptive(
+                                  value: _payDirectlyFromGoal,
+                                  activeTrackColor: AppColors.primary,
+                                  onChanged: (v) => setState(
+                                    () => _payDirectlyFromGoal = v,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
+                          const Divider(indent: 62, height: 1),
+                          HigFormRow(
+                            icon: Icons.person_outline_rounded,
+                            iconColor: AppColors.primary,
+                            label: 'Não é minha despesa (Terceiro)',
+                            subtitle:
+                                'Entra na fatura/conta real, mas sai do seu orçamento',
+                            trailing: Switch.adaptive(
+                              value: _isThirdParty,
+                              activeTrackColor: AppColors.primary,
+                              onChanged: (v) => setState(() {
+                                _isThirdParty = v;
+                                if (v) _isIgnored = false;
+                              }),
+                            ),
+                          ),
                           const Divider(indent: 62, height: 1),
                           HigFormRow(
                             icon: Icons.visibility_off_rounded,
                             iconColor: AppColors.warning(context),
                             label: 'Ignorar transação',
                             subtitle:
-                                'Não conta em categorias, insights, saldos e totais',
+                                'Oculta de tudo (duplicata ou erro de extrato)',
                             trailing: Switch.adaptive(
                               value: _isIgnored,
-                              onChanged: (v) => setState(() => _isIgnored = v),
+                              onChanged: (v) => setState(() {
+                                _isIgnored = v;
+                                if (v) _isThirdParty = false;
+                              }),
                             ),
                           ),
                           const Divider(indent: 62, height: 1),

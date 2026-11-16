@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../services/app_state.dart';
 import '../services/backup_service.dart';
 import '../theme/app_theme.dart';
+import 'ios_action_sheet.dart';
 
 enum _RestoreChoice { merge, overwrite }
 
@@ -408,6 +409,40 @@ class _DataBackupManagerState extends State<DataBackupManager> {
             title: const Text(
               'Compartilhar Relatório (.txt)',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const Divider(indent: 16, height: 1),
+          ListTile(
+            onTap: (_isExporting || _isImporting)
+                ? null
+                : () => IosActionSheet.show(
+                      context: context,
+                      title: 'Recomeçar Carteira do Zero',
+                      description:
+                          'Será salvo um backup JSON automático em Documentos antes de limpar contas, cartões, caixinhas e lançamentos.',
+                      confirmText: 'Backup e Zerar Tudo',
+                      onConfirm: () async {
+                        await widget.appState.resetWalletToDefaults();
+                        if (!mounted) return;
+                        setState(() {
+                          _messageText =
+                              'Backup salvo e carteira reiniciada para começar do zero.';
+                          _isSuccess = true;
+                        });
+                      },
+                    ),
+            leading: Icon(
+              Icons.restart_alt_rounded,
+              color: AppColors.danger(context),
+              size: 20,
+            ),
+            title: Text(
+              'Recomeçar do Zero (Backup + Limpar)',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: AppColors.danger(context),
+              ),
             ),
           ),
           if (_messageText != null) ...[

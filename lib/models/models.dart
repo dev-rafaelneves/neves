@@ -427,6 +427,7 @@ class TransactionModel {
   final String? importHash;
   final bool isInvoicePayment;
   final bool isIgnored;
+  final bool isThirdParty;
 
   const TransactionModel({
     required this.id,
@@ -450,6 +451,7 @@ class TransactionModel {
     this.importHash,
     this.isInvoicePayment = false,
     this.isIgnored = false,
+    this.isThirdParty = false,
   });
 
   bool get isCreditCard => cardId != null && cardId!.isNotEmpty;
@@ -486,6 +488,7 @@ class TransactionModel {
     String? importHash,
     bool? isInvoicePayment,
     bool? isIgnored,
+    bool? isThirdParty,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -509,6 +512,7 @@ class TransactionModel {
       importHash: importHash ?? this.importHash,
       isInvoicePayment: isInvoicePayment ?? this.isInvoicePayment,
       isIgnored: isIgnored ?? this.isIgnored,
+      isThirdParty: isThirdParty ?? this.isThirdParty,
     );
   }
 
@@ -534,6 +538,7 @@ class TransactionModel {
         'import_hash': importHash,
         'is_invoice_payment': isInvoicePayment ? 1 : 0,
         'is_ignored': isIgnored ? 1 : 0,
+        'is_third_party': isThirdParty ? 1 : 0,
       };
 
   factory TransactionModel.fromMap(Map<String, dynamic> m) {
@@ -571,6 +576,7 @@ class TransactionModel {
       importHash: m['import_hash'] as String?,
       isInvoicePayment: (m['is_invoice_payment'] as num?) == 1,
       isIgnored: (m['is_ignored'] as num?) == 1,
+      isThirdParty: (m['is_third_party'] as num?) == 1,
     );
   }
 }
@@ -607,6 +613,7 @@ class GoalModel {
   final String id;
   final String name;
   final double targetAmount;
+  final double initialBalance;
   final double currentAmount;
   final DateTime? targetDate;
   final int colorValue;
@@ -616,6 +623,7 @@ class GoalModel {
     required this.id,
     required this.name,
     required this.targetAmount,
+    this.initialBalance = 0.0,
     required this.currentAmount,
     this.targetDate,
     required this.colorValue,
@@ -631,6 +639,7 @@ class GoalModel {
     String? id,
     String? name,
     double? targetAmount,
+    double? initialBalance,
     double? currentAmount,
     DateTime? targetDate,
     int? colorValue,
@@ -640,6 +649,7 @@ class GoalModel {
       id: id ?? this.id,
       name: name ?? this.name,
       targetAmount: targetAmount ?? this.targetAmount,
+      initialBalance: initialBalance ?? this.initialBalance,
       currentAmount: currentAmount ?? this.currentAmount,
       targetDate: targetDate ?? this.targetDate,
       colorValue: colorValue ?? this.colorValue,
@@ -651,6 +661,7 @@ class GoalModel {
         'id': id,
         'name': name,
         'target_amount': targetAmount,
+        'initial_balance': initialBalance,
         'current_amount': currentAmount,
         'target_date_iso': targetDate?.toIso8601String(),
         'color_value': colorValue,
@@ -661,6 +672,7 @@ class GoalModel {
         id: m['id'] as String,
         name: m['name'] as String,
         targetAmount: (m['target_amount'] as num?)?.toDouble() ?? 0.0,
+        initialBalance: (m['initial_balance'] as num?)?.toDouble() ?? 0.0,
         currentAmount: (m['current_amount'] as num?)?.toDouble() ?? 0.0,
         targetDate: m['target_date_iso'] != null
             ? DateTime.tryParse(m['target_date_iso'] as String)
@@ -703,6 +715,7 @@ class ImportedTransactionCandidate {
   bool selected;
   bool isDuplicate;
   bool ignored;
+  bool isThirdParty;
 
   ImportedTransactionCandidate({
     required this.title,
@@ -718,6 +731,7 @@ class ImportedTransactionCandidate {
     this.selected = true,
     this.isDuplicate = false,
     this.ignored = false,
+    this.isThirdParty = false,
   });
 }
 
