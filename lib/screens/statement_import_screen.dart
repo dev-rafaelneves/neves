@@ -579,14 +579,16 @@ Regras obrigatórias:
           case CofrinhoOperationKind.deposit:
             // Aporte: tira da Conta Corrente e soma no Cofrinho
             txType = TransactionType.expense;
-            txAccountId = _selectedAccountId;
+            txAccountId = _selectedAccountId ??
+                (state.accounts.isNotEmpty ? state.accounts.first.id : null);
             txCategoryId = 'cat_aportes';
             txTags = const ['cofrinho_aporte'];
             break;
           case CofrinhoOperationKind.withdraw:
             // Resgate: devolve para a Conta Corrente e subtrai do Cofrinho
             txType = TransactionType.income;
-            txAccountId = _selectedAccountId;
+            txAccountId = _selectedAccountId ??
+                (state.accounts.isNotEmpty ? state.accounts.first.id : null);
             txCategoryId = 'cat_outras_receitas';
             txTags = const ['resgate_cofrinho'];
             break;

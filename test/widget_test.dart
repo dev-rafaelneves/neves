@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:neves/main.dart';
 import 'package:neves/models/models.dart';
 import 'package:neves/services/app_state.dart';
+import 'package:neves/services/backup_service.dart';
 import 'package:neves/services/import_service.dart';
 import 'package:neves/theme/app_theme.dart';
 import 'package:neves/widgets/month_selector_bar.dart';
@@ -232,5 +233,136 @@ date,category,title,amount
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  test('BackupService gera relatório textual de conciliação completo', () async {
+    final appState = AppState();
+    await appState.init();
+
+    final report = BackupService.instance.buildReconciliationReport(appState);
+
+    expect(report, contains('RELATÓRIO DE CONCILIAÇÃO FINANCEIRA — NEVES'));
+    expect(report, contains('1. RESUMO GERAL'));
+    expect(report, contains('2. CONTAS BANCÁRIAS'));
+    expect(report, contains('3. CARTÕES DE CRÉDITO'));
+    expect(report, contains('5. LANÇAMENTOS'));
+  });
+
+  test('Crédito/estorno no cartão abate fatura e Caixinha não infla receitas/despesas',
+      () async {
+    final appState = AppState();
+    await appState.init();
+
+    const account = Account(
+      id: 'acc_mp',
+      name: 'Mercado Pago',
+      type: AccountType.checking,
+      initialBalance: 100.0,
+      currentBalance: 100.0,
+      colorValue: 0xFF059669,
+      iconName: 'account_balance',
+    );
+    await appState.saveAccount(account);
+
+    const card = CreditCardModel(
+      id: 'card_nb',
+      name: 'Nubank',
+      creditLimit: 5000.0,
+      closingDay: 28,
+      dueDay: 4,
+      colorValue: 0xFF059669,
+    );
+    await appState.saveCreditCard(card);
+
+    const goal = GoalModel(
+      id: 'goal_emg',
+      name: 'Emergência',
+      targetAmount: 1000.0,
+      currentAmount: 0.0,
+      colorValue: 0xFF10B981,
+      iconName: 'savings',
+    );
+    await appState.saveGoal(goal);
+
+    // Compra R$ 200 e crédito/pagamento antecipado R$ 75 no cartão -> fatura líquida R$ 125
+    await appState.addOrUpdateTransaction(
+      TransactionModel(
+        id: 'c1',
+        title: 'Compra',
+        amount: 200.0,
+        type: TransactionType.expense,
+        date: DateTime(2026, 11, 10),
+        competenceMonth: '2026-11',
+        status: TransactionStatus.pending,
+        cardId: card.id,
+        categoryId: 'cat_compras',
+      ),
+    );
+    await appState.addOrUpdateTransaction(
+      TransactionModel(
+        id: 'c2',
+        title: 'Pagamento recebido',
+        amount: 75.0,
+        type: TransactionType.income,
+        date: DateTime(2026, 11, 11),
+        competenceMonth: '2026-11',
+        status: TransactionStatus.pending,
+        cardId: card.id,
+        categoryId: 'cat_outras_receitas',
+      ),
+    );
+
+    // Aporte R$ 50 na Caixinha, Resgate R$ 20, Rendimento R$ 5
+    await appState.addOrUpdateTransaction(
+      TransactionModel(
+        id: 'g1',
+        title: 'Aporte Cofrinho',
+        amount: 50.0,
+        type: TransactionType.expense,
+        date: DateTime(2026, 11, 12),
+        competenceMonth: '2026-11',
+        status: TransactionStatus.paid,
+        accountId: account.id,
+        categoryId: 'cat_aportes',
+        goalId: goal.id,
+        tags: const ['cofrinho_aporte'],
+      ),
+    );
+    await appState.addOrUpdateTransaction(
+      TransactionModel(
+        id: 'g2',
+        title: 'Resgate Cofrinho',
+        amount: 20.0,
+        type: TransactionType.income,
+        date: DateTime(2026, 11, 13),
+        competenceMonth: '2026-11',
+        status: TransactionStatus.paid,
+        accountId: account.id,
+        categoryId: 'cat_outras_receitas',
+        goalId: goal.id,
+        tags: const ['resgate_cofrinho'],
+      ),
+    );
+    await appState.addOrUpdateTransaction(
+      TransactionModel(
+        id: 'g3',
+        title: 'Rendimento Cofrinho',
+        amount: 5.0,
+        type: TransactionType.income,
+        date: DateTime(2026, 11, 14),
+        competenceMonth: '2026-11',
+        status: TransactionStatus.paid,
+        categoryId: 'cat_rendimentos',
+        goalId: goal.id,
+        tags: const ['rendimento_cofrinho'],
+      ),
+    );
+
+    expect(appState.getInvoiceTotal(card.id, '2026-11'), 125.0);
+    expect(appState.getCardUsedLimit(card.id), 125.0);
+    expect(appState.totalExpenseForMonth('2026-11'), 200.0);
+    expect(appState.totalIncomeForMonth('2026-11'), 5.0);
+    expect(appState.getAccountById(account.id)!.currentBalance, 70.0);
+    expect(appState.goalsTotalBalance, 35.0);
   });
 }

@@ -140,6 +140,89 @@ class _DataBackupManagerState extends State<DataBackupManager> {
     );
   }
 
+  Future<void> _handleCopyReport() async {
+    final report = BackupService.instance.buildReconciliationReport(
+      widget.appState,
+    );
+    await Clipboard.setData(ClipboardData(text: report));
+    if (!mounted) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _messageText =
+          'Relatório de conciliação copiado! Cole no assistente para comparar.';
+      _isSuccess = true;
+    });
+  }
+
+  Future<void> _handleSaveReportFile() async {
+    setState(() {
+      _isExporting = true;
+      _messageText = null;
+    });
+    try {
+      final res = await BackupService.instance.generateReconciliationReportFile(
+        widget.appState,
+      );
+      if (!mounted) return;
+      HapticFeedback.lightImpact();
+      setState(() {
+        _messageText = res.success
+            ? 'Relatório (.txt) salvo em Documentos/backups!'
+            : (res.message ?? 'Falha ao salvar relatório.');
+        _isSuccess = res.success;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messageText = 'Erro ao salvar relatório: $e';
+        _isSuccess = false;
+      });
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<void> _handleShareReportFile() async {
+    setState(() {
+      _isExporting = true;
+      _messageText = null;
+    });
+    try {
+      final report = BackupService.instance.buildReconciliationReport(
+        widget.appState,
+      );
+      final bytes = Uint8List.fromList(utf8.encode(report));
+      final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final filename = 'relatorio-conciliacao-neves-$dateStr.txt';
+
+      await Share.shareXFiles(
+        [
+          XFile.fromData(
+            bytes,
+            name: filename,
+            mimeType: 'text/plain',
+          ),
+        ],
+        subject: 'Relatório de Conciliação Neves ($dateStr)',
+      );
+
+      if (!mounted) return;
+      HapticFeedback.lightImpact();
+      setState(() {
+        _messageText = 'Relatório de conciliação exportado!';
+        _isSuccess = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messageText = 'Falha ao compartilhar relatório.';
+        _isSuccess = false;
+      });
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
   Future<void> _handleImportData() async {
     setState(() {
       _isImporting = true;
@@ -279,6 +362,51 @@ class _DataBackupManagerState extends State<DataBackupManager> {
             ),
             title: const Text(
               'Restaurar Backup (JSON)',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const Divider(indent: 16, height: 1),
+          ListTile(
+            onTap: (_isExporting || _isImporting) ? null : _handleCopyReport,
+            leading: const Icon(
+              Icons.content_copy_rounded,
+              color: AppColors.primary,
+              size: 20,
+            ),
+            title: const Text(
+              'Copiar Relatório de Conciliação',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+            subtitle: const Text(
+              'Texto completo com saldos e lançamentos para conferir no banco/IA',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+          const Divider(indent: 16, height: 1),
+          ListTile(
+            onTap:
+                (_isExporting || _isImporting) ? null : _handleSaveReportFile,
+            leading: const Icon(
+              Icons.description_outlined,
+              color: AppColors.primary,
+              size: 20,
+            ),
+            title: const Text(
+              'Salvar Relatório (.txt) em Documentos',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const Divider(indent: 16, height: 1),
+          ListTile(
+            onTap:
+                (_isExporting || _isImporting) ? null : _handleShareReportFile,
+            leading: const Icon(
+              Icons.share_outlined,
+              color: AppColors.primary,
+              size: 20,
+            ),
+            title: const Text(
+              'Compartilhar Relatório (.txt)',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
             ),
           ),

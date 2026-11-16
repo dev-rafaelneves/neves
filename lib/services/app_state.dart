@@ -608,10 +608,10 @@ class AppState extends ChangeNotifier {
           !t.isIgnored &&
           !t.isInvoicePayment &&
           t.status == TransactionStatus.pending) {
-        used += t.amount;
+        used += t.type == TransactionType.income ? -t.amount : t.amount;
       }
     }
-    return used;
+    return used.clamp(0.0, double.infinity);
   }
 
   double getCardAvailableLimit(CreditCardModel card) {
@@ -636,8 +636,12 @@ class AppState extends ChangeNotifier {
   }
 
   double getInvoiceTotal(String cardId, String yearMonth) {
-    return getInvoiceTransactions(cardId, yearMonth)
-        .fold(0.0, (sum, t) => sum + t.amount);
+    final total = getInvoiceTransactions(cardId, yearMonth).fold(
+      0.0,
+      (sum, t) =>
+          sum + (t.type == TransactionType.income ? -t.amount : t.amount),
+    );
+    return total.clamp(0.0, double.infinity);
   }
 
   InvoiceStatus getInvoiceStatus(CreditCardModel card, String yearMonth) {
@@ -667,8 +671,7 @@ class AppState extends ChangeNotifier {
     required String sourceAccountId,
     double? customAmount,
   }) async {
-    final invoiceTxs = getInvoiceTransactions(card.id, yearMonth);
-    final total = invoiceTxs.fold(0.0, (s, t) => s + t.amount);
+    final total = getInvoiceTotal(card.id, yearMonth);
     final amountToPay = customAmount ?? total;
 
     // 1. Marca as compras daquela fatura como pagas (liberando limite do cartão)
@@ -1053,6 +1056,8 @@ class AppState extends ChangeNotifier {
     return transactionsForMonth(yearMonth)
         .where((t) =>
             t.type == TransactionType.income &&
+            !t.isCreditCard &&
+            !t.tags.contains('resgate_cofrinho') &&
             (!onlyPaid || t.status == TransactionStatus.paid))
         .fold(0.0, (s, t) => s + t.amount);
   }
@@ -1062,6 +1067,7 @@ class AppState extends ChangeNotifier {
         .where((t) =>
             t.type == TransactionType.expense &&
             !t.isInvoicePayment &&
+            !t.tags.contains('cofrinho_aporte') &&
             (!onlyPaid ||
                 t.status == TransactionStatus.paid ||
                 t.isCreditCard))
@@ -1100,30 +1106,40 @@ class AppState extends ChangeNotifier {
   /// Saldo Projetado no Fim do Mês = Saldo Atual em Contas Líquidas + Receitas Pendentes do Mês - Despesas Pendentes do Mês - Faturas de Cartão do Mês não pagas
   double projectedEndOfMonthBalance(String yearMonth) {
     final monthTxs = transactionsForMonth(yearMonth);
-    final pendingIncome = monthTxs
-        .where((t) =>
-            t.type == TransactionType.income &&
-            t.status == TransactionStatus.pending)
-        .fold(0.0, (s, t) => s + t.amount);
-
     final pendingCashExpense = monthTxs
         .where((t) =>
             t.type == TransactionType.expense &&
             !t.isCreditCard &&
+            !t.tags.contains('cofrinho_aporte') &&
             t.status == TransactionStatus.pending)
         .fold(0.0, (s, t) => s + t.amount);
 
-    final unpaidCardInvoicesThisMonth = _transactions
+    final pendingIncomeFiltered = monthTxs
         .where((t) =>
-            t.isCreditCard &&
-            !t.isIgnored &&
-            !t.isInvoicePayment &&
-            t.competenceMonth == yearMonth &&
+            t.type == TransactionType.income &&
+            !t.isCreditCard &&
+            !t.tags.contains('resgate_cofrinho') &&
             t.status == TransactionStatus.pending)
         .fold(0.0, (s, t) => s + t.amount);
+
+    final unpaidCardByCard = <String, double>{};
+    for (final t in _transactions) {
+      if (t.isCreditCard &&
+          !t.isIgnored &&
+          !t.isInvoicePayment &&
+          t.competenceMonth == yearMonth &&
+          t.status == TransactionStatus.pending) {
+        final cId = t.cardId!;
+        final signed =
+            t.type == TransactionType.income ? -t.amount : t.amount;
+        unpaidCardByCard[cId] = (unpaidCardByCard[cId] ?? 0.0) + signed;
+      }
+    }
+    final unpaidCardInvoicesThisMonth = unpaidCardByCard.values
+        .fold(0.0, (s, v) => s + v.clamp(0.0, double.infinity));
 
     return liquidAccountsBalance +
-        pendingIncome -
+        pendingIncomeFiltered -
         pendingCashExpense -
         unpaidCardInvoicesThisMonth;
   }
@@ -1133,6 +1149,7 @@ class AppState extends ChangeNotifier {
         .where((t) =>
             t.type == TransactionType.expense &&
             !t.isInvoicePayment &&
+            !t.tags.contains('cofrinho_aporte') &&
             t.categoryId == categoryId)
         .fold(0.0, (s, t) => s + t.amount);
   }
