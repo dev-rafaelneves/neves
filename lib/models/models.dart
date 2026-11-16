@@ -686,7 +686,8 @@ enum ImportTargetMode {
   checking('Conta Corrente'),
   creditCard('Fatura de Cartão'),
   cofrinho('Caixinha'),
-  transfer('Transferência');
+  transfer('Transferência'),
+  unified('Misto (Auto)');
 
   final String label;
   const ImportTargetMode(this.label);
@@ -707,11 +708,16 @@ class ImportedTransactionCandidate {
   final DateTime date;
   TransactionType type;
   final String importHash;
+  ImportTargetMode rowTarget;
   String? suggestedCategoryId;
   CofrinhoOperationKind cofrinhoOp;
   String? targetGoalId;
   String? counterpartAccountId;
   bool isOutgoingTransfer;
+  bool isInvoicePayment;
+  int installmentIndex;
+  int installmentTotal;
+  bool generateFutureInstallments;
   bool selected;
   bool isDuplicate;
   bool ignored;
@@ -723,11 +729,16 @@ class ImportedTransactionCandidate {
     required this.date,
     required this.type,
     required this.importHash,
+    this.rowTarget = ImportTargetMode.checking,
     this.suggestedCategoryId,
     this.cofrinhoOp = CofrinhoOperationKind.deposit,
     this.targetGoalId,
     this.counterpartAccountId,
     this.isOutgoingTransfer = true,
+    this.isInvoicePayment = false,
+    this.installmentIndex = 1,
+    this.installmentTotal = 1,
+    this.generateFutureInstallments = false,
     this.selected = true,
     this.isDuplicate = false,
     this.ignored = false,

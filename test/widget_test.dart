@@ -587,4 +587,107 @@ date,category,title,amount
       isNot(InvoiceStatus.paid),
     );
   });
+
+  test(
+      'Etapa 2: Roteamento Misto (Auto) separa Conta, Caixinha, Transferência e gera parcelas futuras',
+      () async {
+    final appState = AppState();
+    await appState.init();
+
+    const mpAcc = Account(
+      id: 'acc_mp',
+      name: 'Mercado Pago',
+      type: AccountType.checking,
+      initialBalance: 0.0,
+      currentBalance: 0.0,
+      colorValue: 0xFF059669,
+      iconName: 'account_balance',
+    );
+    const nbAcc = Account(
+      id: 'acc_nb',
+      name: 'Nubank',
+      type: AccountType.checking,
+      initialBalance: 0.0,
+      currentBalance: 0.0,
+      colorValue: 0xFF059669,
+      iconName: 'account_balance',
+    );
+    await appState.saveAccount(mpAcc);
+    await appState.saveAccount(nbAcc);
+
+    const card = CreditCardModel(
+      id: 'card_mp',
+      name: 'Mercado Pago',
+      creditLimit: 5000.0,
+      closingDay: 28,
+      dueDay: 4,
+      colorValue: 0xFF059669,
+    );
+    await appState.saveCreditCard(card);
+
+    const goal = GoalModel(
+      id: 'goal_emg',
+      name: 'Emergências',
+      targetAmount: 10000.0,
+      initialBalance: 0.0,
+      currentAmount: 0.0,
+      colorValue: 0xFF10B981,
+      iconName: 'savings',
+    );
+    await appState.saveGoal(goal);
+
+    const mixedRaw = '''
+02/11/2026;Esther Trindade;900,00
+02/11/2026;Reserva em Emergências;-900,00
+07/11/2026;Transferencia propria - Nubank;-75,74
+09/11/2026;Mercado Livre Parcela 1/2;680,07
+''';
+
+    final candidates = ImportService.parseStatementContent(
+      content: mixedRaw,
+      extension: 'csv',
+      categories: appState.categories,
+      existingTransactions: appState.transactions,
+      goals: appState.goals,
+      accounts: appState.accounts,
+      sourceAccountId: mpAcc.id,
+      defaultGoalId: goal.id,
+      forceExpenseForCreditCard: false,
+      hasCardSelected: true,
+      initialMode: ImportTargetMode.unified,
+    );
+
+    expect(candidates[0].rowTarget, ImportTargetMode.checking);
+    expect(candidates[1].rowTarget, ImportTargetMode.cofrinho);
+    expect(candidates[2].rowTarget, ImportTargetMode.transfer);
+    expect(candidates[3].rowTarget, ImportTargetMode.creditCard);
+    expect(candidates[3].installmentIndex, 1);
+    expect(candidates[3].installmentTotal, 2);
+    expect(candidates[3].generateFutureInstallments, isTrue);
+
+    // Ajusta sinal do primeiro item (receita em conta) e da compra parcelada (despesa no cartão)
+    candidates[0].type = TransactionType.income;
+    candidates[3].type = TransactionType.expense;
+
+    final txs = ImportService.buildTransactionsForImport(
+      candidates: candidates,
+      sourceAccountId: mpAcc.id,
+      counterpartAccountId: nbAcc.id,
+      card: card,
+      defaultGoalId: goal.id,
+      accounts: appState.accounts,
+      goals: appState.goals,
+    );
+
+    await appState.addTransactionsBatch(txs);
+
+    // 1 receita + 1 aporte + 1 transferencia + 2 parcelas (1/2 e 2/2) = 5 transações
+    expect(txs.length, 5);
+    expect(appState.getInvoiceTotal(card.id, '2026-11'), closeTo(680.07, 0.01));
+    expect(appState.getInvoiceTotal(card.id, '2026-12'), closeTo(680.07, 0.01));
+    expect(appState.getCardUsedLimit(card.id), closeTo(1360.14, 0.01));
+    expect(appState.goalsTotalBalance, closeTo(900.0, 0.01));
+    expect(appState.getAccountById(mpAcc.id)!.currentBalance, closeTo(-75.74, 0.01));
+    expect(appState.getAccountById(nbAcc.id)!.currentBalance, closeTo(75.74, 0.01));
+  });
 }

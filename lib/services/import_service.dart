@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 
 /// Serviço local para importação de extratos e faturas em formato OFX, CSV ou texto extraído de PDF,
@@ -33,7 +34,9 @@ class ImportService {
     String? sourceAccountId,
     String? defaultCounterpartAccountId,
     bool forceExpenseForCreditCard = false,
+    bool hasCardSelected = false,
     bool invertSigns = false,
+    ImportTargetMode? initialMode,
   }) {
     final ext = extension.toLowerCase().replaceAll('.', '');
     List<ImportedTransactionCandidate> rawCandidates;
@@ -58,11 +61,44 @@ class ImportService {
             computeImportHash(date: t.date, amount: t.amount, title: t.title))
         .toSet();
 
+    final mode = initialMode ??
+        (forceExpenseForCreditCard
+            ? ImportTargetMode.creditCard
+            : ImportTargetMode.checking);
+
     for (final candidate in rawCandidates) {
       candidate.isDuplicate = existingHashes.contains(candidate.importHash);
       if (candidate.isDuplicate) {
         candidate.selected = false;
       }
+
+      final inst = extractInstallmentInfo(candidate.title);
+      if (inst != null) {
+        candidate.installmentIndex = inst.index;
+        candidate.installmentTotal = inst.total;
+      }
+
+      final isPayInvoice = _looksLikeInvoicePayment(candidate.title);
+      candidate.isInvoicePayment = isPayInvoice;
+
+      if (mode == ImportTargetMode.unified) {
+        candidate.rowTarget = detectRowTarget(
+          title: candidate.title,
+          accounts: accounts,
+          sourceAccountId: sourceAccountId,
+          hasCardSelected: hasCardSelected || forceExpenseForCreditCard,
+        );
+      } else {
+        candidate.rowTarget = mode;
+      }
+
+      if (candidate.rowTarget == ImportTargetMode.creditCard &&
+          inst != null &&
+          inst.index < inst.total &&
+          !candidate.isDuplicate) {
+        candidate.generateFutureInstallments = true;
+      }
+
       candidate.suggestedCategoryId = suggestCategory(
         title: candidate.title,
         type: candidate.type,
@@ -91,6 +127,247 @@ class ImportService {
     return rawCandidates;
   }
 
+  static ({int index, int total})? extractInstallmentInfo(String title) {
+    final match = RegExp(
+      r'(?:parcela\s*)?(\d{1,2})\s*/\s*(\d{1,2})\b',
+      caseSensitive: false,
+    ).firstMatch(title);
+    if (match == null) return null;
+    final idx = int.tryParse(match.group(1)!);
+    final total = int.tryParse(match.group(2)!);
+    if (idx == null || total == null) return null;
+    if (idx < 1 || total < 2 || total > 36 || idx > total) return null;
+    return (index: idx, total: total);
+  }
+
+  static bool _looksLikeInvoicePayment(String title) {
+    final lower = title.toLowerCase();
+    return lower.contains('pagamento antecipado da fatura') ||
+        lower.contains('pagamento de fatura') ||
+        lower.contains('pagamento fatura') ||
+        lower.contains('pag. fatura');
+  }
+
+  static ImportTargetMode detectRowTarget({
+    required String title,
+    required List<Account> accounts,
+    String? sourceAccountId,
+    bool hasCardSelected = false,
+  }) {
+    final lower = title.toLowerCase();
+    if (_looksLikeInvoicePayment(title)) {
+      return ImportTargetMode.checking;
+    }
+    if (lower.contains('cofrinho') ||
+        lower.contains('caixinha') ||
+        lower.contains('reserva em ') ||
+        lower.contains('resgate de ') ||
+        lower.contains('rendimento')) {
+      return ImportTargetMode.cofrinho;
+    }
+    if (lower.contains('transferencia propria') ||
+        lower.contains('transferência própria') ||
+        matchCounterpartAccountByTitle(
+              title: title,
+              accounts: accounts,
+              sourceAccountId: sourceAccountId,
+            ) !=
+            null) {
+      return ImportTargetMode.transfer;
+    }
+    if (hasCardSelected && extractInstallmentInfo(title) != null) {
+      return ImportTargetMode.creditCard;
+    }
+    return ImportTargetMode.checking;
+  }
+
+  /// Converte os candidatos selecionados em uma lista de `TransactionModel`
+  /// pronta para `addTransactionsBatch`, incluindo geração opcional de parcelas futuras.
+  static List<TransactionModel> buildTransactionsForImport({
+    required List<ImportedTransactionCandidate> candidates,
+    required String? sourceAccountId,
+    required String? counterpartAccountId,
+    required CreditCardModel? card,
+    required String? defaultGoalId,
+    required List<Account> accounts,
+    required List<GoalModel> goals,
+  }) {
+    const uuid = Uuid();
+    final result = <TransactionModel>[];
+
+    for (final item in candidates) {
+      if (!item.selected) continue;
+
+      final target = item.rowTarget;
+      final compMonth = (target == ImportTargetMode.creditCard && card != null)
+          ? card.computeCompetenceMonth(item.date)
+          : '${item.date.year}-${item.date.month.toString().padLeft(2, '0')}';
+
+      if (target == ImportTargetMode.cofrinho) {
+        final goalId = item.targetGoalId ??
+            defaultGoalId ??
+            (goals.isNotEmpty ? goals.first.id : null);
+
+        late final TransactionType txType;
+        late final String? txAccountId;
+        late final String? txCategoryId;
+        late final List<String> txTags;
+
+        switch (item.cofrinhoOp) {
+          case CofrinhoOperationKind.deposit:
+            txType = TransactionType.expense;
+            txAccountId = sourceAccountId ??
+                (accounts.isNotEmpty ? accounts.first.id : null);
+            txCategoryId = 'cat_aportes';
+            txTags = const ['cofrinho_aporte'];
+            break;
+          case CofrinhoOperationKind.withdraw:
+            txType = TransactionType.income;
+            txAccountId = sourceAccountId ??
+                (accounts.isNotEmpty ? accounts.first.id : null);
+            txCategoryId = 'cat_outras_receitas';
+            txTags = const ['resgate_cofrinho'];
+            break;
+          case CofrinhoOperationKind.yieldGain:
+            txType = TransactionType.income;
+            txAccountId = null;
+            txCategoryId = 'cat_rendimentos';
+            txTags = const ['rendimento_cofrinho'];
+            break;
+        }
+
+        result.add(
+          TransactionModel(
+            id: uuid.v4(),
+            title: item.title,
+            amount: item.amount,
+            type: txType,
+            date: item.date,
+            competenceMonth: compMonth,
+            status: TransactionStatus.paid,
+            accountId: txAccountId,
+            categoryId: txCategoryId,
+            goalId: goalId,
+            tags: txTags,
+            importHash: item.importHash,
+            isIgnored: item.ignored,
+            isThirdParty: item.isThirdParty,
+          ),
+        );
+      } else if (target == ImportTargetMode.transfer) {
+        final otherAccId =
+            item.counterpartAccountId ?? counterpartAccountId ?? sourceAccountId;
+        final srcAccId =
+            item.isOutgoingTransfer ? sourceAccountId : otherAccId;
+        final dstAccId =
+            item.isOutgoingTransfer ? otherAccId : sourceAccountId;
+
+        result.add(
+          TransactionModel(
+            id: uuid.v4(),
+            title: item.title,
+            amount: item.amount,
+            type: TransactionType.transfer,
+            date: item.date,
+            competenceMonth: compMonth,
+            status: TransactionStatus.paid,
+            accountId: srcAccId,
+            destinationAccountId: dstAccId,
+            importHash: item.importHash,
+            isIgnored: item.ignored,
+            isThirdParty: item.isThirdParty,
+          ),
+        );
+      } else if (target == ImportTargetMode.creditCard && card != null) {
+        final hasRemaining = item.generateFutureInstallments &&
+            item.installmentTotal > item.installmentIndex;
+        final count = hasRemaining
+            ? (item.installmentTotal - item.installmentIndex + 1)
+            : 1;
+        final groupId = count > 1 ? uuid.v4() : null;
+
+        final baseParts = compMonth.split('-');
+        final baseYear = int.parse(baseParts[0]);
+        final baseMonth = int.parse(baseParts[1]);
+
+        for (int offset = 0; offset < count; offset++) {
+          int y = baseYear;
+          int m = baseMonth + offset;
+          while (m > 12) {
+            m -= 12;
+            y += 1;
+          }
+          final futureCompYm = '$y-${m.toString().padLeft(2, '0')}';
+          final futureDate = DateTime(
+            item.date.year,
+            item.date.month + offset,
+            item.date.day,
+          );
+          final instNumber = item.installmentIndex + offset;
+          final itemTitle = offset == 0
+              ? item.title
+              : item.title.replaceFirst(
+                  RegExp(
+                    '${item.installmentIndex}\\s*/\\s*${item.installmentTotal}',
+                  ),
+                  '$instNumber/${item.installmentTotal}',
+                );
+
+          result.add(
+            TransactionModel(
+              id: uuid.v4(),
+              title: itemTitle,
+              amount: item.amount,
+              type: item.type,
+              date: futureDate,
+              competenceMonth: futureCompYm,
+              status: TransactionStatus.pending,
+              cardId: card.id,
+              categoryId: item.suggestedCategoryId,
+              installmentGroupId: groupId,
+              installmentIndex: instNumber,
+              installmentTotal: item.installmentTotal,
+              importHash: offset == 0
+                  ? item.importHash
+                  : computeImportHash(
+                      date: futureDate,
+                      amount: item.amount,
+                      title: itemTitle,
+                    ),
+              isIgnored: item.ignored,
+              isThirdParty: item.isThirdParty,
+            ),
+          );
+        }
+      } else {
+        // Conta corrente (incluindo pagamento antecipado de fatura se marcado e houver cartão)
+        final isInvPay = item.isInvoicePayment &&
+            card != null &&
+            item.type == TransactionType.expense;
+        result.add(
+          TransactionModel(
+            id: uuid.v4(),
+            title: item.title,
+            amount: item.amount,
+            type: isInvPay ? TransactionType.transfer : item.type,
+            date: item.date,
+            competenceMonth: compMonth,
+            status: TransactionStatus.paid,
+            accountId: sourceAccountId,
+            cardId: isInvPay ? card.id : null,
+            categoryId: isInvPay ? null : item.suggestedCategoryId,
+            importHash: item.importHash,
+            isInvoicePayment: isInvPay,
+            isIgnored: item.ignored,
+            isThirdParty: item.isThirdParty,
+          ),
+        );
+      }
+    }
+
+    return result;
+  }
+
   static CofrinhoOperationKind detectCofrinhoOp({
     required String title,
     required bool isExpenseBySign,
@@ -108,6 +385,7 @@ class ImportService {
       return CofrinhoOperationKind.withdraw;
     }
     if (lower.contains('aporte') ||
+        lower.contains('reserva') ||
         lower.contains('guardado') ||
         lower.contains('aplicação') ||
         lower.contains('aplicacao') ||

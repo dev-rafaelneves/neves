@@ -98,7 +98,9 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
       sourceAccountId: _selectedAccountId,
       defaultCounterpartAccountId: _selectedCounterpartAccountId,
       forceExpenseForCreditCard: _importToCard,
+      hasCardSelected: _selectedCardId != null,
       invertSigns: _invertSigns,
+      initialMode: _targetMode,
     );
     HapticFeedback.lightImpact();
     setState(() {
@@ -180,11 +182,12 @@ class _StatementImportScreenState extends State<StatementImportScreen> {
   void _toggleSingleCandidateType(ImportedTransactionCandidate c) {
     HapticFeedback.selectionClick();
     setState(() {
-      if (_targetMode == ImportTargetMode.transfer) {
+      final mode = c.rowTarget;
+      if (mode == ImportTargetMode.transfer) {
         c.isOutgoingTransfer = !c.isOutgoingTransfer;
         return;
       }
-      if (_targetMode == ImportTargetMode.cofrinho) {
+      if (mode == ImportTargetMode.cofrinho) {
         switch (c.cofrinhoOp) {
           case CofrinhoOperationKind.deposit:
             c.cofrinhoOp = CofrinhoOperationKind.withdraw;
@@ -423,6 +426,23 @@ Regras obrigatórias:
    - POSITIVO para transferências recebidas nesta conta (ex: 500.00)
 5. Retorne apenas o bloco CSV pronto para copiar.''',
         );
+      case ImportTargetMode.unified:
+        return (
+          title: 'Prompt — Extrato Misto / Unificado (Auto)',
+          subtitle:
+              'Envie ao assistente do seu banco para gerar um único CSV combinando Conta Corrente, Cofrinhos e Transferências (ou Fatura) para roteamento automático.',
+          prompt:
+              '''Gere uma tabela em formato CSV (separado por ponto e vírgula ";") contendo TODAS as movimentações da minha conta no mês atual, com exatamente 3 colunas: Data;Descricao;Valor
+
+Regras obrigatórias:
+1. Inclua receitas, despesas, aportes/resgates/rendimentos de Cofrinhos e transferências entre minhas próprias contas.
+2. Coluna Data no formato DD/MM/AAAA.
+3. Coluna Descricao limpa, sem ponto e vírgula (;), mantendo prefixos claros quando aplicável ("Aporte Cofrinho - [Nome]", "Resgate Cofrinho - [Nome]", "Rendimento Cofrinho - [Nome]", "Transferencia para [Banco]", "Pagamento de fatura").
+4. Coluna Valor em formato numérico com ponto decimal (sem "R\$"):
+   - POSITIVO para entradas/resgates/rendimentos na conta (ex: 1500.00)
+   - NEGATIVO para saídas/aportes/transferências enviadas (ex: -200.00)
+5. Retorne apenas o bloco CSV pronto para copiar.''',
+        );
     }
   }
 
@@ -539,7 +559,9 @@ Regras obrigatórias:
 
     final state = widget.appState;
     CreditCardModel? card;
-    if (_importToCard) {
+    final needsCard = _importToCard ||
+        selected.any((c) => c.rowTarget == ImportTargetMode.creditCard);
+    if (needsCard) {
       if (state.creditCards.isEmpty) {
         await _quickCreateNubankCard();
       }
@@ -547,7 +569,10 @@ Regras obrigatórias:
       card = state.getCardById(_selectedCardId);
     }
 
-    if (_targetMode == ImportTargetMode.cofrinho && state.goals.isEmpty) {
+    final needsGoal = (_targetMode == ImportTargetMode.cofrinho ||
+            selected.any((c) => c.rowTarget == ImportTargetMode.cofrinho)) &&
+        state.goals.isEmpty;
+    if (needsGoal) {
       final defaultGoal = GoalModel(
         id: _uuid.v4(),
         name: 'Caixinha Principal',
@@ -560,114 +585,15 @@ Regras obrigatórias:
       _selectedGoalId = defaultGoal.id;
     }
 
-    final batch = <TransactionModel>[];
-
-    for (final item in selected) {
-      final compMonth = card != null
-          ? card.computeCompetenceMonth(item.date)
-          : '${item.date.year}-${item.date.month.toString().padLeft(2, '0')}';
-
-      if (_targetMode == ImportTargetMode.cofrinho) {
-        final goalId = item.targetGoalId ??
-            _selectedGoalId ??
-            (state.goals.isNotEmpty ? state.goals.first.id : null);
-
-        late final TransactionType txType;
-        late final String? txAccountId;
-        late final String? txCategoryId;
-        late final List<String> txTags;
-
-        switch (item.cofrinhoOp) {
-          case CofrinhoOperationKind.deposit:
-            // Aporte: tira da Conta Corrente e soma no Cofrinho
-            txType = TransactionType.expense;
-            txAccountId = _selectedAccountId ??
-                (state.accounts.isNotEmpty ? state.accounts.first.id : null);
-            txCategoryId = 'cat_aportes';
-            txTags = const ['cofrinho_aporte'];
-            break;
-          case CofrinhoOperationKind.withdraw:
-            // Resgate: devolve para a Conta Corrente e subtrai do Cofrinho
-            txType = TransactionType.income;
-            txAccountId = _selectedAccountId ??
-                (state.accounts.isNotEmpty ? state.accounts.first.id : null);
-            txCategoryId = 'cat_outras_receitas';
-            txTags = const ['resgate_cofrinho'];
-            break;
-          case CofrinhoOperationKind.yieldGain:
-            // Rendimento: soma apenas no saldo do Cofrinho (accountId = null para não inflar a Conta Corrente)
-            txType = TransactionType.income;
-            txAccountId = null;
-            txCategoryId = 'cat_rendimentos';
-            txTags = const ['rendimento_cofrinho'];
-            break;
-        }
-
-        batch.add(
-          TransactionModel(
-            id: _uuid.v4(),
-            title: item.title,
-            amount: item.amount,
-            type: txType,
-            date: item.date,
-            competenceMonth: compMonth,
-            status: TransactionStatus.paid,
-            accountId: txAccountId,
-            categoryId: txCategoryId,
-            goalId: goalId,
-            tags: txTags,
-            importHash: item.importHash,
-            isIgnored: item.ignored,
-            isThirdParty: item.isThirdParty,
-          ),
-        );
-      } else if (_targetMode == ImportTargetMode.transfer) {
-        final otherAccId = item.counterpartAccountId ??
-            _selectedCounterpartAccountId ??
-            _selectedAccountId;
-        final sourceAccId =
-            item.isOutgoingTransfer ? _selectedAccountId : otherAccId;
-        final destAccId =
-            item.isOutgoingTransfer ? otherAccId : _selectedAccountId;
-
-        batch.add(
-          TransactionModel(
-            id: _uuid.v4(),
-            title: item.title,
-            amount: item.amount,
-            type: TransactionType.transfer,
-            date: item.date,
-            competenceMonth: compMonth,
-            status: TransactionStatus.paid,
-            accountId: sourceAccId,
-            destinationAccountId: destAccId,
-            importHash: item.importHash,
-            isIgnored: item.ignored,
-            isThirdParty: item.isThirdParty,
-          ),
-        );
-      } else {
-        batch.add(
-          TransactionModel(
-            id: _uuid.v4(),
-            title: item.title,
-            amount: item.amount,
-            type: item.type,
-            date: item.date,
-            competenceMonth: compMonth,
-            status: _importToCard
-                ? TransactionStatus.pending
-                : TransactionStatus.paid,
-            accountId: _importToCard ? null : _selectedAccountId,
-            cardId: _importToCard ? _selectedCardId : null,
-            categoryId: item.suggestedCategoryId,
-            importHash: item.importHash,
-            isIgnored: item.ignored,
-            isThirdParty: item.isThirdParty,
-          ),
-        );
-      }
-    }
+    final batch = ImportService.buildTransactionsForImport(
+      candidates: selected,
+      sourceAccountId: _selectedAccountId,
+      counterpartAccountId: _selectedCounterpartAccountId,
+      card: card ?? state.getCardById(_selectedCardId),
+      defaultGoalId: _selectedGoalId,
+      accounts: state.accounts,
+      goals: state.goals,
+    );
 
     await state.addTransactionsBatch(batch);
 
@@ -676,7 +602,7 @@ Regras obrigatórias:
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${selected.length} lançamentos importados com sucesso!',
+            '${batch.length} lançamentos importados com sucesso!',
           ),
           backgroundColor: AppColors.successStrong,
         ),
@@ -879,8 +805,93 @@ Regras obrigatórias:
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Text('Misto (Auto)'),
+                              selected:
+                                  _targetMode == ImportTargetMode.unified,
+                              onSelected: (_) {
+                                setState(
+                                  () => _targetMode = ImportTargetMode.unified,
+                                );
+                                if (_rawContent != null &&
+                                    _loadedFileName != null) {
+                                  _parseContent(
+                                    _rawContent!,
+                                    _rawExtension,
+                                    _loadedFileName!,
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 14),
-                      if (_targetMode == ImportTargetMode.creditCard)
+                      if (_targetMode == ImportTargetMode.unified) ...[
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedAccountId,
+                          decoration: const InputDecoration(
+                            labelText: 'Conta Bancária do Extrato',
+                            isDense: true,
+                          ),
+                          items: state.accounts
+                              .map(
+                                (a) => DropdownMenuItem(
+                                  value: a.id,
+                                  child: Text(a.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _selectedAccountId = v),
+                        ),
+                        if (state.creditCards.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedCardId ??
+                                state.creditCards.first.id,
+                            decoration: const InputDecoration(
+                              labelText: 'Cartão Associado (p/ faturas/parcelas)',
+                              isDense: true,
+                            ),
+                            items: state.creditCards
+                                .map(
+                                  (c) => DropdownMenuItem(
+                                    value: c.id,
+                                    child: Text(c.name),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _selectedCardId = v),
+                          ),
+                        ],
+                        if (state.goals.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedGoalId ??
+                                state.goals.first.id,
+                            decoration: const InputDecoration(
+                              labelText: 'Caixinha Padrão',
+                              isDense: true,
+                            ),
+                            items: state.goals
+                                .map(
+                                  (g) => DropdownMenuItem(
+                                    value: g.id,
+                                    child: Text(g.name),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _selectedGoalId = v),
+                          ),
+                        ],
+                      ] else if (_targetMode == ImportTargetMode.creditCard)
                         if (state.creditCards.isNotEmpty)
                           DropdownButtonFormField<String>(
                             initialValue: _selectedCardId ??
@@ -1397,6 +1408,95 @@ Regras obrigatórias:
                           ],
                         ),
                         const SizedBox(height: 8),
+                        Builder(
+                          builder: (context) {
+                            final previewTxs =
+                                ImportService.buildTransactionsForImport(
+                              candidates: selectedCandidates,
+                              sourceAccountId: _selectedAccountId,
+                              counterpartAccountId:
+                                  _selectedCounterpartAccountId,
+                              card: state.getCardById(_selectedCardId),
+                              defaultGoalId: _selectedGoalId,
+                              accounts: state.accounts,
+                              goals: state.goals,
+                            );
+                            final targetAcc =
+                                state.getAccountById(_selectedAccountId);
+                            double accDelta = 0.0;
+                            double goalsDelta = 0.0;
+                            for (final t in previewTxs) {
+                              if (t.isIgnored) continue;
+                              if (targetAcc != null &&
+                                  t.status == TransactionStatus.paid &&
+                                  (!t.isCreditCard || t.isInvoicePayment)) {
+                                if (t.type == TransactionType.income &&
+                                    t.accountId == targetAcc.id) {
+                                  accDelta += t.amount;
+                                } else if (t.type == TransactionType.expense &&
+                                    t.accountId == targetAcc.id) {
+                                  accDelta -= t.amount;
+                                } else if (t.type == TransactionType.transfer) {
+                                  if (t.accountId == targetAcc.id) {
+                                    accDelta -= t.amount;
+                                  }
+                                  if (t.destinationAccountId == targetAcc.id) {
+                                    accDelta += t.amount;
+                                  }
+                                }
+                              }
+                              if (t.goalId != null &&
+                                  t.status == TransactionStatus.paid) {
+                                final isContrib =
+                                    t.tags.contains('cofrinho_aporte') ||
+                                        t.tags.contains('rendimento_cofrinho') ||
+                                        t.categoryId == 'cat_rendimentos';
+                                goalsDelta += isContrib ? t.amount : -t.amount;
+                              }
+                            }
+                            final futureCount =
+                                previewTxs.length - selectedCount;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Wrap(
+                                spacing: 10,
+                                runSpacing: 4,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  if (targetAcc != null && accDelta != 0)
+                                    Text(
+                                      '${targetAcc.name} ficará: ${AppFormatters.currency(targetAcc.currentBalance + accDelta)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark
+                                            ? AppColors.darkTextPrimary
+                                            : AppColors.lightTextPrimary,
+                                      ),
+                                    ),
+                                  if (goalsDelta != 0)
+                                    Text(
+                                      'Caixinhas ficarão: ${AppFormatters.currency((state.goalsTotalBalance + goalsDelta).clamp(0.0, double.infinity))}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.success(context),
+                                      ),
+                                    ),
+                                  if (futureCount > 0)
+                                    Text(
+                                      '+$futureCount parcela(s) futura(s)',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(

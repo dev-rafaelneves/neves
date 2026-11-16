@@ -37,11 +37,12 @@ class ImportCandidateCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final c = candidate;
+    final effectiveTarget = c.rowTarget;
 
     late final Color badgeColor;
     late final String badgeText;
 
-    if (targetMode == ImportTargetMode.cofrinho) {
+    if (effectiveTarget == ImportTargetMode.cofrinho) {
       switch (c.cofrinhoOp) {
         case CofrinhoOperationKind.deposit:
           badgeColor = AppColors.primary;
@@ -56,12 +57,15 @@ class ImportCandidateCard extends StatelessWidget {
           badgeText = 'Rendimento (+ Caixinha) ⇄';
           break;
       }
-    } else if (targetMode == ImportTargetMode.transfer) {
+    } else if (effectiveTarget == ImportTargetMode.transfer) {
       badgeColor =
           c.isOutgoingTransfer ? AppColors.rose : AppColors.emerald;
       badgeText = c.isOutgoingTransfer
           ? 'Saída ➔ Outra Conta ⇄'
           : 'Entrada ⬅ Outra Conta ⇄';
+    } else if (c.isInvoicePayment && effectiveTarget == ImportTargetMode.checking) {
+      badgeColor = AppColors.primary;
+      badgeText = 'Pag. Fatura ⇄';
     } else {
       badgeColor = c.type == TransactionType.income
           ? AppColors.emerald
@@ -215,6 +219,57 @@ class ImportCandidateCard extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (targetMode == ImportTargetMode.unified)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, bottom: 6),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final m in const [
+                          ImportTargetMode.checking,
+                          ImportTargetMode.creditCard,
+                          ImportTargetMode.cofrinho,
+                          ImportTargetMode.transfer,
+                        ]) ...[
+                          ChoiceChip(
+                            label: Text(
+                              m.label,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            selected: c.rowTarget == m,
+                            visualDensity: VisualDensity.compact,
+                            onSelected: (_) {
+                              c.rowTarget = m;
+                              onChanged();
+                            },
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              if (c.rowTarget == ImportTargetMode.creditCard &&
+                  c.installmentTotal > c.installmentIndex)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, bottom: 6),
+                  child: FilterChip(
+                    label: Text(
+                      'Gerar +${c.installmentTotal - c.installmentIndex} parcela(s) futura(s) (${c.installmentIndex}/${c.installmentTotal})',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    selected: c.generateFutureInstallments,
+                    visualDensity: VisualDensity.compact,
+                    onSelected: (v) {
+                      c.generateFutureInstallments = v;
+                      onChanged();
+                    },
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.only(left: 12),
                 child: Container(
@@ -244,7 +299,8 @@ class ImportCandidateCard extends StatelessWidget {
 
   Widget _buildSelector(BuildContext context) {
     final c = candidate;
-    if (targetMode == ImportTargetMode.cofrinho && goals.isNotEmpty) {
+    final effectiveTarget = c.rowTarget;
+    if (effectiveTarget == ImportTargetMode.cofrinho && goals.isNotEmpty) {
       return DropdownButton<String>(
         value: goals.any((g) => g.id == c.targetGoalId)
             ? c.targetGoalId
@@ -273,7 +329,7 @@ class ImportCandidateCard extends StatelessWidget {
       );
     }
 
-    if (targetMode == ImportTargetMode.transfer && accounts.isNotEmpty) {
+    if (effectiveTarget == ImportTargetMode.transfer && accounts.isNotEmpty) {
       return DropdownButton<String>(
         value: accounts.any((a) => a.id == c.counterpartAccountId)
             ? c.counterpartAccountId
