@@ -1,255 +1,163 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/app_state.dart';
 import '../theme/app_theme.dart';
-import '../widgets/app_lock_gate.dart';
+import '../widgets/month_selector_bar.dart';
 import '../widgets/neves_app_icon.dart';
-import 'main_shell/bottom_nav_item.dart';
-import 'main_shell/dashboard_tab.dart';
-import 'main_shell/planning_tab.dart';
-import 'main_shell/settings_tab.dart';
-import 'main_shell/transactions_tab.dart';
+import 'tabs/cards_settings_tab.dart';
+import 'tabs/summary_tab.dart';
+import 'tabs/transactions_tab.dart';
 import 'transaction_form_sheet.dart';
+import 'unified_import_screen.dart';
 
-class MainShell extends StatefulWidget {
+class MainShell extends StatelessWidget {
   final AppState appState;
 
-  const MainShell({
-    super.key,
-    required this.appState,
-  });
-
-  @override
-  State<MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<MainShell> {
-  int _selectedIndex = 0;
-  String? _cardFilterId;
-  String? _categoryFilterId;
+  const MainShell({super.key, required this.appState});
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: widget.appState,
-      builder: (context, _) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final isWide = MediaQuery.sizeOf(context).width >= 840;
+    final tabIdx = appState.activeTabIndex;
 
-    final bodyStack = IndexedStack(
-      index: _selectedIndex,
-      children: [
-        DashboardTab(
-          appState: widget.appState,
-          onOpenCardStatement: (card) => setState(() {
-            _cardFilterId = card.id;
-            _categoryFilterId = null;
-            _selectedIndex = 1;
-          }),
-          onOpenCategoryStatement: (cat) => setState(() {
-            _categoryFilterId = cat.id;
-            _cardFilterId = null;
-            _selectedIndex = 1;
-          }),
-        ),
-        TransactionsTab(
-          appState: widget.appState,
-          cardFilterId: _cardFilterId,
-          onClearCardFilter: () => setState(() => _cardFilterId = null),
-          categoryFilterId: _categoryFilterId,
-          onClearCategoryFilter: () => setState(() => _categoryFilterId = null),
-        ),
-        PlanningTab(appState: widget.appState),
-        SettingsTab(appState: widget.appState),
-      ],
-    );
+    final Widget body;
+    switch (tabIdx) {
+      case 1:
+        body = TransactionsTab(appState: appState);
+        break;
+      case 2:
+        body = CardsSettingsTab(appState: appState);
+        break;
+      case 0:
+      default:
+        body = SummaryTab(appState: appState);
+        break;
+    }
 
-    return AppLockGate(
-      appState: widget.appState,
-      child: Scaffold(
-        extendBody: !isWide,
-        floatingActionButton: !isWide && _selectedIndex < 3
-            ? FloatingActionButton.extended(
-                key: const ValueKey('fab_new_transaction'),
-                onPressed: () => TransactionFormSheet.show(
-                  context,
-                  appState: widget.appState,
-                ),
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 4,
-                icon: const Icon(Icons.add_rounded, size: 22),
-                label: const Text(
-                  'Lançar',
+    return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 58,
+        titleSpacing: 14,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const NevesAppIcon(size: 32),
+                const SizedBox(width: 8),
+                Text(
+                  'Neves',
                   style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                    color: AppColors.textPrimary(context),
                   ),
                 ),
-              )
-            : null,
-        body: isWide
-            ? Row(
-                children: [
-                  NavigationRail(
-                    selectedIndex: _selectedIndex,
-                    backgroundColor:
-                        isDark ? AppColors.darkSurface : Colors.white,
-                    indicatorColor: AppColors.primary.withValues(alpha: 0.14),
-                    selectedIconTheme:
-                        const IconThemeData(color: AppColors.primary),
-                    selectedLabelTextStyle: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                    unselectedLabelTextStyle: TextStyle(
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
-                    ),
-                    labelType: NavigationRailLabelType.all,
-                    leading: Padding(
-                      padding: const EdgeInsets.only(top: 16, bottom: 20),
-                      child: Column(
-                        children: [
-                          const NevesAppIcon(size: 40),
-                          const SizedBox(height: 16),
-                          FloatingActionButton(
-                            key: const ValueKey('fab_new_transaction'),
-                            heroTag: 'rail_fab_new_transaction',
-                            elevation: 2,
-                            tooltip: 'Novo lançamento',
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            onPressed: () => TransactionFormSheet.show(
-                              context,
-                              appState: widget.appState,
-                            ),
-                            child: const Icon(Icons.add_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
-                    onDestinationSelected: (idx) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _selectedIndex = idx);
-                    },
-                    destinations: const [
-                      NavigationRailDestination(
-                        icon: Icon(Icons.pie_chart_outline_rounded),
-                        selectedIcon: Icon(Icons.pie_chart_rounded),
-                        label: Text('Resumo'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.receipt_long_outlined),
-                        selectedIcon: Icon(Icons.receipt_long_rounded),
-                        label: Text('Lançamentos'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.track_changes_outlined),
-                        selectedIcon: Icon(Icons.track_changes_rounded),
-                        label: Text('Planejamento'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Icon(Icons.settings_outlined),
-                        selectedIcon: Icon(Icons.settings_rounded),
-                        label: Text('Ajustes'),
-                      ),
-                    ],
+              ],
+            ),
+            MonthSelectorBar(appState: appState),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Importar Extrato / Fatura',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => UnifiedImportScreen.open(
+                    context,
+                    appState: appState,
                   ),
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 0.8,
-                    color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                  ),
-                  Expanded(child: bodyStack),
-                ],
-              )
-            : bodyStack,
-        bottomNavigationBar: isWide
-            ? null
-            : ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 83),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.darkSurface.withValues(alpha: 0.85)
-                          : Colors.white.withValues(alpha: 0.85),
-                      border: Border(
-                        top: BorderSide(
-                          color: isDark
-                              ? AppColors.darkBorder
-                              : AppColors.lightBorder,
-                          width: 0.8,
-                        ),
-                      ),
-                    ),
-                    child: SafeArea(
-                      top: false,
-                      child: Center(
-                        heightFactor: 1.0,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 480),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              BottomNavItem(
-                                icon: Icons.pie_chart_outline_rounded,
-                                activeIcon: Icons.pie_chart_rounded,
-                                label: 'Resumo',
-                                isSelected: _selectedIndex == 0,
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _selectedIndex = 0);
-                                },
-                              ),
-                              BottomNavItem(
-                                icon: Icons.receipt_long_outlined,
-                                activeIcon: Icons.receipt_long_rounded,
-                                label: 'Lançamentos',
-                                isSelected: _selectedIndex == 1,
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _selectedIndex = 1);
-                                },
-                              ),
-                              BottomNavItem(
-                                icon: Icons.track_changes_outlined,
-                                activeIcon: Icons.track_changes_rounded,
-                                label: 'Planejamento',
-                                isSelected: _selectedIndex == 2,
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _selectedIndex = 2);
-                                },
-                              ),
-                              BottomNavItem(
-                                icon: Icons.settings_outlined,
-                                activeIcon: Icons.settings_rounded,
-                                label: 'Ajustes',
-                                isSelected: _selectedIndex == 3,
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() => _selectedIndex = 3);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                  icon: Icon(
+                    Icons.upload_file_rounded,
+                    size: 21,
+                    color: AppColors.textSecondary(context),
                   ),
                 ),
-              ),
+                IconButton(
+                  tooltip: appState.discreetMode
+                      ? 'Mostrar valores'
+                      : 'Ocultar valores',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    appState.toggleDiscreetMode();
+                  },
+                  icon: Icon(
+                    appState.discreetMode
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    size: 21,
+                    color: AppColors.textSecondary(context),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-    );
-      },
+      body: body,
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Novo Lançamento',
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        onPressed: () => TransactionFormSheet.show(
+          context,
+          appState: appState,
+        ),
+        child: const Icon(Icons.add_rounded, size: 28),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface(context),
+          border: Border(
+            top: BorderSide(
+              color: AppColors.border(context),
+              width: 0.8,
+            ),
+          ),
+        ),
+        child: NavigationBar(
+          height: 64,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          selectedIndex: tabIdx,
+          indicatorColor: AppColors.primary.withValues(alpha: 0.14),
+          onDestinationSelected: (idx) {
+            HapticFeedback.selectionClick();
+            appState.setActiveTab(idx);
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.pie_chart_outline_rounded),
+              selectedIcon: Icon(
+                Icons.pie_chart_rounded,
+                color: AppColors.primary,
+              ),
+              label: 'Resumo',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon: Icon(
+                Icons.receipt_long_rounded,
+                color: AppColors.primary,
+              ),
+              label: 'Extrato',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.credit_card_outlined),
+              selectedIcon: Icon(
+                Icons.credit_card_rounded,
+                color: AppColors.primary,
+              ),
+              label: 'Cartões & Ajustes',
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

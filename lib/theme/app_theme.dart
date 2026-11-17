@@ -4,53 +4,65 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class AppColors {
-  // Light Mode (Apple HIG - espelhado do BioStats)
+  // Light Mode (Apple HIG)
   static const Color lightBackground = Color(0xFFF2F2F7);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightBorder = Color(0xFFE2E8F0);
-  static const Color lightTextPrimary = Color(0xFF0F172A); // slate-900
-  static const Color lightTextSecondary = Color(0xFF64748B); // slate-500
+  static const Color lightTextPrimary = Color(0xFF0F172A);
+  static const Color lightTextSecondary = Color(0xFF64748B);
 
-  // Dark Mode (Slate Palette - espelhado do BioStats)
-  static const Color darkBackground = Color(0xFF020617); // slate-950
-  static const Color darkSurface = Color(0xFF0F172A); // slate-900
-  static const Color darkBorder = Color(0xFF1E293B); // slate-800
-  static const Color darkTextPrimary = Color(0xFFF8FAFC); // slate-50
-  static const Color darkTextSecondary = Color(0xFF94A3B8); // slate-400
+  // Dark Mode (Slate Palette)
+  static const Color darkBackground = Color(0xFF020617);
+  static const Color darkSurface = Color(0xFF0F172A);
+  static const Color darkBorder = Color(0xFF1E293B);
+  static const Color darkTextPrimary = Color(0xFFF8FAFC);
+  static const Color darkTextSecondary = Color(0xFF94A3B8);
 
-  // Accents (Paleta Verde Financeiro Apple HIG)
-  static const Color primary = Color(0xFF059669); // emerald-600 (Verde Principal)
-  static const Color primaryLight = Color(0xFF10B981); // emerald-500 (Verde Claro)
-  static const Color primarySoft = Color(0xFFECFDF5); // emerald-50 (Verde Suave)
-  static const Color emerald = Color(0xFF10B981); // emerald-500
-  static const Color orange = Color(0xFFF97316); // orange-500
-  static const Color rose = Color(0xFFF43F5E); // rose-500
-  static const Color blue = Color(0xFF3B82F6); // blue-500
-  static const Color secondary = Color(0xFF0D9488); // teal-600 (Verde-Azulado Secundário)
-  static const Color cyan = Color(0xFF06B6D4); // cyan-500
-  static const Color amber = Color(0xFFF59E0B); // amber-500
+  // Accents
+  static const Color primary = Color(0xFF059669); // emerald-600
+  static const Color primaryLight = Color(0xFF10B981); // emerald-500
+  static const Color primarySoft = Color(0xFFECFDF5);
+  static const Color emerald = Color(0xFF10B981);
+  static const Color orange = Color(0xFFF97316);
+  static const Color rose = Color(0xFFF43F5E);
+  static const Color blue = Color(0xFF3B82F6);
+  static const Color purple = Color(0xFF8B5CF6);
+  static const Color cyan = Color(0xFF06B6D4);
+  static const Color amber = Color(0xFFF59E0B);
+  static const Color indigo = Color(0xFF6366F1);
 
-  // Variantes com contraste AA (>= 4.5:1) para TEXTO sobre fundo claro.
-  static const Color successStrong = Color(0xFF047857); // emerald-700 (5,5:1)
-  static const Color dangerStrong = Color(0xFFE11D48); // rose-600 (4,7:1)
-  static const Color warningStrong = Color(0xFFC2410C); // orange-700 (5,2:1)
+  static const List<Color> presetPalette = [
+    Color(0xFF8B5CF6), // Roxo (Nubank style)
+    Color(0xFFF97316), // Laranja (Itaú/Inter style)
+    Color(0xFF3B82F6), // Azul
+    Color(0xFF059669), // Esmeralda
+    Color(0xFFF43F5E), // Rosa/Vermelho
+    Color(0xFF06B6D4), // Ciano
+    Color(0xFFF59E0B), // Âmbar
+    Color(0xFF475569), // Grafite/Black
+  ];
 
-  static bool _isDark(BuildContext c) =>
+  // Contraste AA para textos semânticos
+  static const Color successStrong = Color(0xFF047857);
+  static const Color dangerStrong = Color(0xFFE11D48);
+  static const Color warningStrong = Color(0xFFC2410C);
+
+  static bool isDark(BuildContext c) =>
       Theme.of(c).brightness == Brightness.dark;
 
-  /// Cor de texto/ícone de sucesso com contraste adequado ao tema atual.
-  static Color success(BuildContext c) => _isDark(c) ? emerald : successStrong;
-
-  /// Cor de texto/ícone de erro/despesa com contraste adequado ao tema atual.
-  static Color danger(BuildContext c) => _isDark(c) ? rose : dangerStrong;
-
-  /// Cor de texto/ícone de alerta com contraste adequado ao tema atual.
-  static Color warning(BuildContext c) => _isDark(c) ? orange : warningStrong;
+  static Color success(BuildContext c) => isDark(c) ? emerald : successStrong;
+  static Color danger(BuildContext c) => isDark(c) ? rose : dangerStrong;
+  static Color warning(BuildContext c) => isDark(c) ? orange : warningStrong;
+  static Color textPrimary(BuildContext c) =>
+      isDark(c) ? darkTextPrimary : lightTextPrimary;
+  static Color textSecondary(BuildContext c) =>
+      isDark(c) ? darkTextSecondary : lightTextSecondary;
+  static Color surface(BuildContext c) =>
+      isDark(c) ? darkSurface : lightSurface;
+  static Color border(BuildContext c) => isDark(c) ? darkBorder : lightBorder;
 }
 
-/// Formatador estilo Nubank / Bancos Brasileiros:
-/// Digita da direita para a esquerda em centavos:
-/// '' -> '0,00' -> digita '5' -> '0,05' -> digita '0' -> '0,50' -> digita '0' -> '5,00' -> '1.250,00'
+/// Formatador de moeda em centavos (digitação da direita para a esquerda).
 class CentavosCurrencyFormatter extends TextInputFormatter {
   final int maxDigits;
 
@@ -110,8 +122,18 @@ class AppFormatters {
     return _currency.format(value);
   }
 
-  /// Rótulo amigável de mês a partir de 'YYYY-MM' (ex.: 'Novembro/2026').
-  /// Com [short] = true retorna 'nov/26'.
+  static String yearMonthFromDate(DateTime dt) {
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+  }
+
+  static String addMonths(String ym, int deltaMonths) {
+    final parts = ym.split('-');
+    final y = int.parse(parts[0]);
+    final m = int.parse(parts[1]);
+    final dt = DateTime(y, m + deltaMonths, 1);
+    return yearMonthFromDate(dt);
+  }
+
   static String monthLabel(String ym, {bool short = false}) {
     final parts = ym.split('-');
     if (parts.length != 2) return ym;
@@ -119,24 +141,23 @@ class AppFormatters {
     final m = int.tryParse(parts[1]);
     if (y == null || m == null) return ym;
     final dt = DateTime(y, m, 1);
-    if (short) return DateFormat('MMM/yy', 'pt_BR').format(dt);
-    final raw = DateFormat('MMMM/yyyy', 'pt_BR').format(dt);
+    if (short) {
+      final s = DateFormat('MMM/yy', 'pt_BR').format(dt).replaceAll('.', '');
+      return s[0].toUpperCase() + s.substring(1);
+    }
+    final raw = DateFormat("MMMM 'de' yyyy", 'pt_BR').format(dt);
     return raw[0].toUpperCase() + raw.substring(1);
   }
 
-  static String compactCurrency(double value, {bool discreet = false}) {
-    if (discreet) return 'R\$ •••';
-    if (value.abs() >= 1000000) {
-      return 'R\$ ${(value / 1000000).toStringAsFixed(1)}M';
-    }
-    if (value.abs() >= 10000) {
-      return 'R\$ ${(value / 1000).toStringAsFixed(1)}k';
-    }
-    return _currency.format(value);
+  static String shortDate(DateTime dt) {
+    return DateFormat('dd/MM/yyyy', 'pt_BR').format(dt);
+  }
+
+  static String dayMonth(DateTime dt) {
+    return DateFormat('dd MMM', 'pt_BR').format(dt).replaceAll('.', '');
   }
 }
 
-/// Cabeçalho de seção estilo Apple HIG (espelhado do SectionHeader do BioStats)
 class HigSectionHeader extends StatelessWidget {
   final String title;
   final Widget? trailing;
@@ -151,9 +172,8 @@ class HigSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: EdgeInsets.only(left: 14, right: 6, bottom: bottomPadding),
+      padding: EdgeInsets.only(left: 6, right: 6, bottom: bottomPadding),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -163,9 +183,7 @@ class HigSectionHeader extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,
-              color: isDark
-                  ? AppColors.darkTextSecondary
-                  : AppColors.lightTextSecondary,
+              color: AppColors.textSecondary(context),
             ),
           ),
           if (trailing != null) trailing!,
@@ -175,124 +193,41 @@ class HigSectionHeader extends StatelessWidget {
   }
 }
 
-/// Card agrupado estilo Apple HIG Inset Grouped Table
 class HigGroupedCard extends StatelessWidget {
   final List<Widget> children;
+  final EdgeInsetsGeometry? padding;
 
   const HigGroupedCard({
     super.key,
     required this.children,
+    this.padding,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    Widget content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+    if (padding != null) {
+      content = Padding(padding: padding!, child: content);
+    }
     return Material(
-      color: isDark ? AppColors.darkSurface : Colors.white,
+      color: AppColors.surface(context),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          color: AppColors.border(context),
           width: 0.8,
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: children,
-      ),
+      child: content,
     );
   }
 }
 
-/// Linha de formulário estilo Apple HIG (Ícone + Rótulo à esquerda, Controle/Valor à direita)
-class HigFormRow extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String? subtitle;
-  final Widget trailing;
-  final VoidCallback? onTap;
-
-  const HigFormRow({
-    super.key,
-    required this.icon,
-    this.iconColor = AppColors.primary,
-    required this.label,
-    this.subtitle,
-    required this.trailing,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final content = Container(
-      constraints: const BoxConstraints(minHeight: 56),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(icon, color: iconColor, size: 19),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w500,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.lightTextPrimary,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Align(
-              alignment: Alignment.centerRight,
-              widthFactor: 1.0,
-              child: trailing,
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (onTap != null) {
-      return InkWell(onTap: onTap, child: content);
-    }
-    return content;
-  }
-}
-
-/// Campo de Valor Monetário Hero estilo Nubank + QuickWeightDialog do BioStats
 class HigCurrencyHeroField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
@@ -313,16 +248,14 @@ class HigCurrencyHeroField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
+        color: AppColors.surface(context),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          color: AppColors.border(context),
           width: 0.8,
         ),
       ),
@@ -331,15 +264,13 @@ class HigCurrencyHeroField extends StatelessWidget {
           Text(
             label.toUpperCase(),
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11.5,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.9,
-              color: isDark
-                  ? AppColors.darkTextSecondary
-                  : AppColors.lightTextSecondary,
+              letterSpacing: 0.8,
+              color: AppColors.textSecondary(context),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -367,7 +298,7 @@ class HigCurrencyHeroField extends StatelessWidget {
                     textAlign: TextAlign.center,
                     onChanged: onChanged,
                     style: TextStyle(
-                      fontSize: 40,
+                      fontSize: 38,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -1.2,
                       color: accentColor,
@@ -387,7 +318,7 @@ class HigCurrencyHeroField extends StatelessWidget {
             ],
           ),
           if (bottomAccessory != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             bottomAccessory!,
           ],
         ],
@@ -490,36 +421,4 @@ class AppTheme {
       ),
     );
   }
-}
-
-/// Garante que controllers criados para modais só sejam descartados após a
-/// desmontagem completa da árvore (depois da animação de saída da rota).
-class HigModalScope extends StatefulWidget {
-  final List<ChangeNotifier> disposables;
-  final Widget child;
-
-  const HigModalScope({
-    super.key,
-    required this.disposables,
-    required this.child,
-  });
-
-  @override
-  State<HigModalScope> createState() => _HigModalScopeState();
-}
-
-class _HigModalScopeState extends State<HigModalScope> {
-  @override
-  void dispose() {
-    final items = List<ChangeNotifier>.from(widget.disposables);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      for (final item in items) {
-        item.dispose();
-      }
-    });
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
 }

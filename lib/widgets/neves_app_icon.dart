@@ -5,7 +5,7 @@ class NevesAppIcon extends StatelessWidget {
 
   const NevesAppIcon({
     super.key,
-    this.size = 80,
+    this.size = 64,
   });
 
   @override

@@ -5,26 +5,25 @@ import 'screens/main_shell.dart';
 import 'services/app_state.dart';
 import 'theme/app_theme.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR', null);
+
   final appState = AppState();
-  await appState.init();
-  runApp(NevesFinanceApp(appState: appState));
+  await appState.initialize();
+
+  runApp(NevesMvpApp(appState: appState));
 }
 
-class NevesFinanceApp extends StatelessWidget {
+class NevesMvpApp extends StatelessWidget {
   final AppState appState;
 
-  const NevesFinanceApp({
-    super.key,
-    required this.appState,
-  });
+  const NevesMvpApp({super.key, required this.appState});
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: appState.themeModeNotifier,
+      listenable: appState,
       builder: (context, _) {
         return MaterialApp(
           title: 'Neves Finanças',
@@ -32,16 +31,13 @@ class NevesFinanceApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: appState.themeMode,
+          locale: const Locale('pt', 'BR'),
+          supportedLocales: const [Locale('pt', 'BR')],
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          supportedLocales: const [
-            Locale('pt', 'BR'),
-            Locale('en', 'US'),
-          ],
-          locale: const Locale('pt', 'BR'),
           home: MainShell(appState: appState),
         );
       },

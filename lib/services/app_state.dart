@@ -3,1401 +3,685 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
-import 'backup_service.dart';
+import '../theme/app_theme.dart';
 import 'database_service.dart';
-import 'gemini_service.dart';
-import 'notification_service.dart';
-import 'security_service.dart';
+import 'import_service.dart';
 
 class AppState extends ChangeNotifier {
-  static const _uuid = Uuid();
+  static const _prefThemeMode = 'neves_mvp_theme_mode';
+  static const _prefDiscreet = 'neves_mvp_discreet';
 
-  SharedPreferences? _prefs;
-  SharedPreferences? get prefs => _prefs;
+  final Uuid _uuid = const Uuid();
 
-  ThemeMode _themeMode = ThemeMode.light;
-  ThemeMode get themeMode => _themeMode;
-  final ValueNotifier<ThemeMode> themeModeNotifier =
-      ValueNotifier<ThemeMode>(ThemeMode.light);
-
-  bool _discreetMode = false;
-  bool get discreetMode => _discreetMode;
-
-  BudgetRegime _budgetRegime = BudgetRegime.competence;
-  BudgetRegime get budgetRegime => _budgetRegime;
-
-  String _userName = 'Minha Carteira';
-  String get userName => _userName;
+  List<CategoryItem> _categories = [];
+  List<CreditCardItem> _cards = [];
+  List<TransactionItem> _transactions = [];
 
   late String _selectedYearMonth;
-  String get selectedYearMonth => _selectedYearMonth;
+  ThemeMode _themeMode = ThemeMode.system;
+  bool _discreetMode = false;
+  bool _isLoaded = false;
 
-  // Segurança (AppLockGate)
-  bool _hasPinLock = false;
-  bool get hasPinLock => _hasPinLock;
-
-  bool _isLocked = false;
-  bool get isLocked => _isLocked;
-
-  bool _useBiometrics = true;
-  bool get useBiometrics => _useBiometrics;
-
-  bool _blockScreenshots = true;
-  bool get blockScreenshots => _blockScreenshots;
-
-  DateTime? _lockoutUntil;
-  bool get isLockedOut =>
-      _lockoutUntil != null && _lockoutUntil!.isAfter(DateTime.now());
-  int get remainingLockoutSeconds =>
-      SecurityService.getRemainingLockoutSeconds(_lockoutUntil);
-
-  // Lembretes
-  bool _dailyBillsReminderEnabled = false;
-  bool get dailyBillsReminderEnabled => _dailyBillsReminderEnabled;
-  int _dailyBillsReminderHour = 9;
-  int get dailyBillsReminderHour => _dailyBillsReminderHour;
-  int _dailyBillsReminderMinute = 0;
-  int get dailyBillsReminderMinute => _dailyBillsReminderMinute;
-
-  // Entidades em memória sincronizadas com SQLite / SharedPreferences
-  List<Account> _accounts = [];
-  List<Account> get accounts => List.unmodifiable(_accounts);
-
-  List<CreditCardModel> _creditCards = [];
-  List<CreditCardModel> get creditCards => List.unmodifiable(_creditCards);
-
-  List<CreditCardInvoice> _invoices = [];
-  List<CreditCardInvoice> get invoices => List.unmodifiable(_invoices);
-
-  List<CategoryModel> _categories = [];
-  List<CategoryModel> get categories => List.unmodifiable(_categories);
-
-  List<TransactionModel> _transactions = [];
-  List<TransactionModel> get transactions => List.unmodifiable(_transactions);
-
-  List<BudgetModel> _budgets = [];
-  List<BudgetModel> get budgets => List.unmodifiable(_budgets);
-
-  List<GoalModel> _goals = [];
-  List<GoalModel> get goals => List.unmodifiable(_goals);
+  // Navegação cruzada opcional (ex.: tocar em um cartão no Resumo abre o Extrato filtrado)
+  int _activeTabIndex = 0;
+  String? _extratoFilter; // null = Todos, 'cash', 'income', ou 'card:<cardId>'
 
   AppState() {
-    final now = DateTime.now();
-    _selectedYearMonth =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    _selectedYearMonth = AppFormatters.yearMonthFromDate(DateTime.now());
   }
 
-  Future<void> init() async {
-    _prefs = await SharedPreferences.getInstance();
-    await DatabaseService.init();
-    await NotificationService.instance.init();
+  bool get isLoaded => _isLoaded;
+  String get selectedYearMonth => _selectedYearMonth;
+  ThemeMode get themeMode => _themeMode;
+  bool get discreetMode => _discreetMode;
+  int get activeTabIndex => _activeTabIndex;
+  String? get extratoFilter => _extratoFilter;
 
-    // Carregar preferências
-    final isDark = _prefs?.getBool('neves_dark_mode') ?? false;
-    _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
-    themeModeNotifier.value = _themeMode;
-    _discreetMode = _prefs?.getBool('neves_discreet_mode') ?? false;
-    _budgetRegime = BudgetRegime.fromString(
-      _prefs?.getString('neves_budget_regime'),
+  List<CategoryItem> get categories => List.unmodifiable(_categories);
+  List<CreditCardItem> get cards => List.unmodifiable(_cards);
+  List<TransactionItem> get allTransactions => List.unmodifiable(_transactions);
+
+  List<CategoryItem> categoriesByType(TransactionType type) =>
+      _categories.where((c) => c.type == type).toList();
+
+  CategoryItem categoryById(String id) {
+    return _categories.firstWhere(
+      (c) => c.id == id,
+      orElse: () => const CategoryItem(
+        id: 'cat_other_exp',
+        name: 'Outros',
+        iconKey: 'category',
+        colorValue: 0xFF64748B,
+        type: TransactionType.expense,
+      ),
     );
-    _userName = _prefs?.getString('neves_user_name') ?? 'Minha Carteira';
+  }
 
-    _dailyBillsReminderEnabled =
-        _prefs?.getBool('neves_daily_reminder_enabled') ?? false;
-    _dailyBillsReminderHour = _prefs?.getInt('neves_daily_reminder_hour') ?? 9;
-    _dailyBillsReminderMinute =
-        _prefs?.getInt('neves_daily_reminder_min') ?? 0;
-
-    // Segurança
-    _hasPinLock = await SecurityService.hasSecurePin();
-    _isLocked = _hasPinLock;
-    _useBiometrics = SecurityService.isBiometricsEnabled(_prefs);
-    _blockScreenshots = SecurityService.isBlockScreenshotsEnabled(_prefs);
-    _lockoutUntil = SecurityService.getLockoutUntil(_prefs);
-    if (_blockScreenshots) {
-      await SecurityService.setFlagSecure(true);
+  CreditCardItem? cardById(String? id) {
+    if (id == null) return null;
+    for (final c in _cards) {
+      if (c.id == id) return c;
     }
+    return null;
+  }
 
-    await _loadAllData();
-    await _ensureSeeds();
+  Future<void> initialize() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final themeStr = prefs.getString(_prefThemeMode);
+      if (themeStr == 'light') {
+        _themeMode = ThemeMode.light;
+      } else if (themeStr == 'dark') {
+        _themeMode = ThemeMode.dark;
+      } else {
+        _themeMode = ThemeMode.system;
+      }
+      _discreetMode = prefs.getBool(_prefDiscreet) ?? false;
+    } catch (_) {}
 
-    await BackupService.instance.checkAndRunWeeklyAutoBackup(this);
+    _categories = await DatabaseService.instance.loadCategories();
+    _cards = await DatabaseService.instance.loadCards();
+    _transactions = await DatabaseService.instance.loadTransactions();
+    _sortTransactions();
+    _isLoaded = true;
     notifyListeners();
   }
 
-  Future<void> _loadAllData() async {
-    if (DatabaseService.isAvailable) {
-      _accounts = await DatabaseService.getAccounts();
-      _creditCards = await DatabaseService.getCreditCards();
-      _invoices = await DatabaseService.getInvoices();
-      _categories = await DatabaseService.getCategories();
-      _transactions = await DatabaseService.getTransactions();
-      _budgets = await DatabaseService.getBudgets();
-      _goals = await DatabaseService.getGoals();
-      if (_creditCards.isEmpty && _prefs != null) {
-        final rawCards = _prefs!.getString('neves_cards');
-        if (rawCards != null && rawCards.isNotEmpty) {
-          try {
-            final list = jsonDecode(rawCards) as List<dynamic>;
-            _creditCards = list
-                .map((e) =>
-                    CreditCardModel.fromMap(Map<String, dynamic>.from(e as Map)))
-                .toList();
-          } catch (_) {}
-        }
-      }
-    } else {
-      // Fallback SharedPreferences caso rode na Web ou teste sem sqflite
-      _loadFromPrefsFallback();
-    }
+  void _sortTransactions() {
+    _transactions.sort((a, b) {
+      final cmp = b.date.compareTo(a.date);
+      if (cmp != 0) return cmp;
+      return b.id.compareTo(a.id);
+    });
   }
 
-  void _loadFromPrefsFallback() {
-    if (_prefs == null) return;
-    List<T> decodeList<T>(
-      String key,
-      T Function(Map<String, dynamic>) fromMap,
-    ) {
-      final raw = _prefs!.getString(key);
-      if (raw == null || raw.isEmpty) return [];
-      try {
-        final list = jsonDecode(raw) as List<dynamic>;
-        return list
-            .map((e) => fromMap(Map<String, dynamic>.from(e as Map)))
-            .toList();
-      } catch (_) {
-        return [];
-      }
+  void setActiveTab(int index, {String? filter}) {
+    _activeTabIndex = index;
+    if (filter != null) {
+      _extratoFilter = filter;
     }
-
-    _accounts = decodeList('neves_accounts', Account.fromMap);
-    _creditCards = decodeList('neves_cards', CreditCardModel.fromMap);
-    _invoices = decodeList('neves_invoices', CreditCardInvoice.fromMap);
-    _categories = decodeList('neves_categories', CategoryModel.fromMap);
-    _transactions = decodeList('neves_transactions', TransactionModel.fromMap);
-    _budgets = decodeList('neves_budgets', BudgetModel.fromMap);
-    _goals = decodeList('neves_goals', GoalModel.fromMap);
+    notifyListeners();
   }
 
-  Future<void> _persistFallbackIfNeeded() async {
-    if (_prefs == null || DatabaseService.isAvailable) return;
-    await _prefs!.setString(
-      'neves_accounts',
-      jsonEncode(_accounts.map((e) => e.toMap()).toList()),
-    );
-    await _prefs!.setString(
-      'neves_cards',
-      jsonEncode(_creditCards.map((e) => e.toMap()).toList()),
-    );
-    await _prefs!.setString(
-      'neves_invoices',
-      jsonEncode(_invoices.map((e) => e.toMap()).toList()),
-    );
-    await _prefs!.setString(
-      'neves_categories',
-      jsonEncode(_categories.map((e) => e.toMap()).toList()),
-    );
-    await _prefs!.setString(
-      'neves_transactions',
-      jsonEncode(_transactions.map((e) => e.toMap()).toList()),
-    );
-    await _prefs!.setString(
-      'neves_budgets',
-      jsonEncode(_budgets.map((e) => e.toMap()).toList()),
-    );
-    await _prefs!.setString(
-      'neves_goals',
-      jsonEncode(_goals.map((e) => e.toMap()).toList()),
-    );
+  void setExtratoFilter(String? filter) {
+    _extratoFilter = filter;
+    notifyListeners();
   }
 
-  Future<void> _ensureSeeds() async {
-    if (_categories.isEmpty) {
-      final defaultCategories = <CategoryModel>[
-        const CategoryModel(
-          id: 'cat_moradia',
-          name: 'Moradia & Contas',
-          type: TransactionType.expense,
-          pillar: Pillar503020.essential,
-          colorValue: 0xFF059669,
-          iconName: 'home',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_mercado',
-          name: 'Supermercado',
-          type: TransactionType.expense,
-          pillar: Pillar503020.essential,
-          colorValue: 0xFF10B981,
-          iconName: 'shopping_cart',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_transporte',
-          name: 'Transporte & Combustível',
-          type: TransactionType.expense,
-          pillar: Pillar503020.essential,
-          colorValue: 0xFF3B82F6,
-          iconName: 'directions_car',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_saude',
-          name: 'Saúde & Farmácia',
-          type: TransactionType.expense,
-          pillar: Pillar503020.essential,
-          colorValue: 0xFFF43F5E,
-          iconName: 'favorite',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_educacao',
-          name: 'Educação & Cursos',
-          type: TransactionType.expense,
-          pillar: Pillar503020.essential,
-          colorValue: 0xFF06B6D4,
-          iconName: 'school',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_restaurante',
-          name: 'Restaurantes & Delivery',
-          type: TransactionType.expense,
-          pillar: Pillar503020.lifestyle,
-          colorValue: 0xFFF97316,
-          iconName: 'restaurant',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_lazer',
-          name: 'Lazer & Viagens',
-          type: TransactionType.expense,
-          pillar: Pillar503020.lifestyle,
-          colorValue: 0xFF0D9488,
-          iconName: 'sports_esports',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_assinaturas',
-          name: 'Assinaturas & Apps',
-          type: TransactionType.expense,
-          pillar: Pillar503020.lifestyle,
-          colorValue: 0xFF16A34A,
-          iconName: 'subscriptions',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_compras',
-          name: 'Compras & Vestuário',
-          type: TransactionType.expense,
-          pillar: Pillar503020.lifestyle,
-          colorValue: 0xFFF59E0B,
-          iconName: 'shopping_bag',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_aportes',
-          name: 'Aportes & Futuro',
-          type: TransactionType.expense,
-          pillar: Pillar503020.future,
-          colorValue: 0xFF059669,
-          iconName: 'savings',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_salario',
-          name: 'Salário & Pró-Labore',
-          type: TransactionType.income,
-          pillar: Pillar503020.essential,
-          colorValue: 0xFF10B981,
-          iconName: 'work',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_rendimentos',
-          name: 'Dividendos & Rendimentos',
-          type: TransactionType.income,
-          pillar: Pillar503020.future,
-          colorValue: 0xFF059669,
-          iconName: 'trending_up',
-          isSystem: true,
-        ),
-        const CategoryModel(
-          id: 'cat_outras_receitas',
-          name: 'Renda Extra & Reembolsos',
-          type: TransactionType.income,
-          pillar: Pillar503020.lifestyle,
-          colorValue: 0xFF3B82F6,
-          iconName: 'redeem',
-          isSystem: true,
-        ),
-      ];
-
-      for (final c in defaultCategories) {
-        _categories.add(c);
-        await DatabaseService.saveCategory(c);
-      }
-    }
-
-    if (_accounts.isEmpty) {
-      final defaultAccounts = <Account>[
-        const Account(
-          id: 'acc_principal',
-          name: 'Conta Corrente Principal',
-          type: AccountType.checking,
-          initialBalance: 0.0,
-          currentBalance: 0.0,
-          colorValue: 0xFF059669,
-          iconName: 'account_balance',
-        ),
-        const Account(
-          id: 'acc_investimentos',
-          name: 'Carteira de Investimentos',
-          type: AccountType.investment,
-          initialBalance: 0.0,
-          currentBalance: 0.0,
-          colorValue: 0xFF10B981,
-          iconName: 'trending_up',
-        ),
-      ];
-      for (final a in defaultAccounts) {
-        _accounts.add(a);
-        await DatabaseService.saveAccount(a);
-      }
-    }
-
-    if (_goals.isEmpty) {
-      const emergencyGoal = GoalModel(
-        id: 'goal_reserva',
-        name: 'Reserva de Emergência',
-        targetAmount: 15000.0,
-        currentAmount: 0.0,
-        colorValue: 0xFF10B981,
-        iconName: 'shield',
-      );
-      _goals.add(emergencyGoal);
-      await DatabaseService.saveGoal(emergencyGoal);
-    }
-
-    await _persistFallbackIfNeeded();
-  }
-
-  // --- Navegação de Mês e Preferências ---
   void setSelectedYearMonth(String ym) {
+    if (_selectedYearMonth == ym) return;
     _selectedYearMonth = ym;
     notifyListeners();
   }
 
-  void changeMonth(int deltaMonths) {
-    final parts = _selectedYearMonth.split('-');
-    int y = int.parse(parts[0]);
-    int m = int.parse(parts[1]) + deltaMonths;
-    while (m > 12) {
-      m -= 12;
-      y += 1;
-    }
-    while (m < 1) {
-      m += 12;
-      y -= 1;
-    }
-    _selectedYearMonth = '$y-${m.toString().padLeft(2, '0')}';
-    notifyListeners();
-  }
-
-  Future<void> toggleTheme() async {
-    _themeMode =
-        _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-    themeModeNotifier.value = _themeMode;
-    await _prefs?.setBool('neves_dark_mode', _themeMode == ThemeMode.dark);
+  void changeMonth(int delta) {
+    _selectedYearMonth = AppFormatters.addMonths(_selectedYearMonth, delta);
     notifyListeners();
   }
 
   Future<void> toggleDiscreetMode() async {
     _discreetMode = !_discreetMode;
-    await _prefs?.setBool('neves_discreet_mode', _discreetMode);
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefDiscreet, _discreetMode);
+    } catch (_) {}
   }
 
-  Future<void> setBudgetRegime(BudgetRegime regime) async {
-    _budgetRegime = regime;
-    await _prefs?.setString('neves_budget_regime', regime.name);
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = mode == ThemeMode.light
+          ? 'light'
+          : (mode == ThemeMode.dark ? 'dark' : 'system');
+      await prefs.setString(_prefThemeMode, str);
+    } catch (_) {}
   }
 
-  Future<void> setUserName(String name) async {
-    if (name.trim().isEmpty) return;
-    _userName = name.trim();
-    await _prefs?.setString('neves_user_name', _userName);
-    notifyListeners();
+  // ==================== CÁLCULOS DO MÊS (REGRA ÚNICA) ====================
+
+  List<TransactionItem> transactionsForMonth([String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    return _transactions.where((t) => t.competenceMonth == target).toList();
   }
 
-  // --- Segurança (PIN / Biometria / FLAG_SECURE) ---
-  Future<void> setAppPin(String? pin) async {
-    if (pin == null || pin.trim().isEmpty) {
-      await SecurityService.removeSecurePin();
-      _hasPinLock = false;
-      _isLocked = false;
-    } else {
-      await SecurityService.saveSecurePin(pin.trim());
-      _hasPinLock = true;
-      _isLocked = false;
-    }
-    await SecurityService.resetFailedAttempts(_prefs);
-    _lockoutUntil = null;
-    notifyListeners();
-  }
-
-  void lockSession() {
-    if (_hasPinLock) {
-      _isLocked = true;
-      notifyListeners();
-    }
-  }
-
-  Future<bool> unlockSession(String candidatePin) async {
-    if (isLockedOut) return false;
-    final ok = await SecurityService.verifyPin(candidatePin);
-    if (ok) {
-      _isLocked = false;
-      _lockoutUntil = null;
-      await SecurityService.resetFailedAttempts(_prefs);
-      notifyListeners();
-      return true;
-    } else {
-      _lockoutUntil = await SecurityService.recordFailedAttempt(_prefs);
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> unlockWithBiometrics() async {
-    if (!_hasPinLock || !_useBiometrics || isLockedOut) return false;
-    final ok = await SecurityService.authenticateBiometric();
-    if (ok) {
-      _isLocked = false;
-      _lockoutUntil = null;
-      await SecurityService.resetFailedAttempts(_prefs);
-      notifyListeners();
-    }
-    return ok;
-  }
-
-  Future<void> toggleBiometrics() async {
-    _useBiometrics = !_useBiometrics;
-    await SecurityService.setBiometricsEnabled(_prefs, _useBiometrics);
-    notifyListeners();
-  }
-
-  Future<void> toggleBlockScreenshots() async {
-    _blockScreenshots = !_blockScreenshots;
-    await SecurityService.setBlockScreenshotsEnabled(
-      _prefs,
-      _blockScreenshots,
-    );
-    notifyListeners();
-  }
-
-  // --- Lembretes e Gemini ---
-  Future<void> updateDailyBillsReminder({
-    bool? enabled,
-    int? hour,
-    int? minute,
-  }) async {
-    if (enabled != null) _dailyBillsReminderEnabled = enabled;
-    if (hour != null) _dailyBillsReminderHour = hour;
-    if (minute != null) _dailyBillsReminderMinute = minute;
-
-    await _prefs?.setBool(
-      'neves_daily_reminder_enabled',
-      _dailyBillsReminderEnabled,
-    );
-    await _prefs?.setInt('neves_daily_reminder_hour', _dailyBillsReminderHour);
-    await _prefs?.setInt('neves_daily_reminder_min', _dailyBillsReminderMinute);
-
-    if (_dailyBillsReminderEnabled) {
-      await NotificationService.instance.requestPermissions();
-    }
-    await NotificationService.instance.scheduleDailyBillsReminder(
-      enabled: _dailyBillsReminderEnabled,
-      hour: _dailyBillsReminderHour,
-      minute: _dailyBillsReminderMinute,
-    );
-    notifyListeners();
-  }
-
-  Future<void> saveGeminiApiKey(String key) async {
-    await GeminiService.saveApiKey(key);
-    notifyListeners();
-  }
-
-  Future<void> removeGeminiApiKey() async {
-    await GeminiService.removeApiKey();
-    notifyListeners();
-  }
-
-  // --- CRUD Contas ---
-  Account? getAccountById(String? id) {
-    if (id == null) return null;
-    for (final a in _accounts) {
-      if (a.id == id) return a;
-    }
-    return null;
-  }
-
-  Future<void> saveAccount(Account account) async {
-    final idx = _accounts.indexWhere((a) => a.id == account.id);
-    if (idx >= 0) {
-      _accounts[idx] = account;
-    } else {
-      _accounts.add(account);
-    }
-    await DatabaseService.saveAccount(account);
-    await _recalculateAccountBalances();
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  Future<void> updateInvestmentBalance(String accountId, double newBalance) async {
-    final acc = getAccountById(accountId);
-    if (acc == null) return;
-    // Ajusta initialBalance para que currentBalance fique igual a newBalance
-    final delta = newBalance - acc.currentBalance;
-    final updated = acc.copyWith(
-      initialBalance: acc.initialBalance + delta,
-      currentBalance: newBalance,
-    );
-    await saveAccount(updated);
-  }
-
-  Future<void> deleteAccount(String id) async {
-    _accounts.removeWhere((a) => a.id == id);
-    await DatabaseService.deleteAccount(id);
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  // --- CRUD Cartões de Crédito e Faturas ---
-  CreditCardModel? getCardById(String? id) {
-    if (id == null) return null;
-    for (final c in _creditCards) {
-      if (c.id == id) return c;
-    }
-    return null;
-  }
-
-  Future<void> saveCreditCard(CreditCardModel card) async {
-    final idx = _creditCards.indexWhere((c) => c.id == card.id);
-    if (idx >= 0) {
-      _creditCards[idx] = card;
-    } else {
-      _creditCards.add(card);
-    }
-    await DatabaseService.saveCreditCard(card);
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  Future<void> deleteCreditCard(String id) async {
-    _creditCards.removeWhere((c) => c.id == id);
-    await DatabaseService.deleteCreditCard(id);
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  /// Retorna o limite total ocupado no cartão por compras/parcelas ainda não pagas,
-  /// descontando eventuais adiantamentos/pagamentos parciais já vinculados à fatura.
-  double getCardUsedLimit(String cardId) {
-    final pendingByMonth = <String, double>{};
+  /// Total de Receitas do mês
+  double monthIncome([String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    double sum = 0.0;
     for (final t in _transactions) {
-      if (t.cardId == cardId &&
-          !t.isIgnored &&
-          !t.isInvoicePayment &&
-          t.status == TransactionStatus.pending) {
-        final signed =
-            t.type == TransactionType.income ? -t.amount : t.amount;
-        pendingByMonth[t.competenceMonth] =
-            (pendingByMonth[t.competenceMonth] ?? 0.0) + signed;
+      if (t.competenceMonth == target && t.type == TransactionType.income) {
+        sum += t.amount;
       }
     }
-    double used = 0.0;
-    for (final entry in pendingByMonth.entries) {
-      final paidOnMonth = getInvoicePaidAmount(cardId, entry.key);
-      used += (entry.value - paidOnMonth).clamp(0.0, double.infinity);
-    }
-    return used;
+    return sum;
   }
 
-  double getCardAvailableLimit(CreditCardModel card) {
-    return (card.creditLimit - getCardUsedLimit(card.id))
-        .clamp(0.0, double.infinity);
-  }
-
-  /// Lista todos os lançamentos pertencentes à fatura de um cartão em determinado mês (YYYY-MM)
-  List<TransactionModel> getInvoiceTransactions(
-    String cardId,
-    String yearMonth,
-  ) {
-    return _transactions
-        .where(
-          (t) =>
-              t.cardId == cardId &&
-              t.competenceMonth == yearMonth &&
-              !t.isIgnored &&
-              !t.isInvoicePayment,
-        )
-        .toList();
-  }
-
-  double getInvoiceTotal(String cardId, String yearMonth) {
-    final total = getInvoiceTransactions(cardId, yearMonth).fold(
-      0.0,
-      (sum, t) =>
-          sum + (t.type == TransactionType.income ? -t.amount : t.amount),
-    );
-    return total.clamp(0.0, double.infinity);
-  }
-
-  /// Soma pagamentos parciais/antecipados já efetuados para esta fatura.
-  double getInvoicePaidAmount(String cardId, String yearMonth) {
-    return _transactions
-        .where(
-          (t) =>
-              t.cardId == cardId &&
-              t.competenceMonth == yearMonth &&
-              t.isInvoicePayment &&
-              !t.isIgnored &&
-              t.status == TransactionStatus.paid,
-        )
-        .fold(0.0, (sum, t) => sum + t.amount);
-  }
-
-  /// Valor ainda em aberto para quitação da fatura do cartão neste mês.
-  double getInvoiceRemaining(String cardId, String yearMonth) {
-    final txs = getInvoiceTransactions(cardId, yearMonth);
-    if (txs.isNotEmpty && txs.every((t) => t.status == TransactionStatus.paid)) {
-      return 0.0;
-    }
-    final remaining =
-        getInvoiceTotal(cardId, yearMonth) - getInvoicePaidAmount(cardId, yearMonth);
-    return remaining.clamp(0.0, double.infinity);
-  }
-
-  InvoiceStatus getInvoiceStatus(CreditCardModel card, String yearMonth) {
-    for (final inv in _invoices) {
-      if (inv.cardId == card.id &&
-          inv.yearMonth == yearMonth &&
-          inv.status == InvoiceStatus.paid) {
-        return InvoiceStatus.paid;
+  /// Total de Gastos à Vista (Pix / Débito) no mês
+  double monthCashExpense([String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    double sum = 0.0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.expense &&
+          t.paymentMethod == PaymentMethod.cash) {
+        sum += t.amount;
       }
     }
-    final txs = getInvoiceTransactions(card.id, yearMonth);
-    if (txs.isNotEmpty && txs.every((t) => t.status == TransactionStatus.paid)) {
-      return InvoiceStatus.paid;
-    }
-    final parts = yearMonth.split('-');
-    final y = int.parse(parts[0]);
-    final m = int.parse(parts[1]);
-    final closingDate = DateTime(y, m, card.closingDay);
-    if (DateTime.now().isAfter(closingDate)) {
-      return InvoiceStatus.closed;
-    }
-    return InvoiceStatus.open;
+    return sum;
   }
 
-  /// Efetua o pagamento total ou parcial da fatura debitando de uma conta bancária.
-  /// Pagamentos parciais mantêm a fatura em aberto exibindo apenas o saldo restante.
-  Future<void> payCreditCardInvoice({
-    required CreditCardModel card,
-    required String yearMonth,
-    required String sourceAccountId,
-    double? customAmount,
-  }) async {
-    final remainingBefore = getInvoiceRemaining(card.id, yearMonth);
-    final amountToPay = customAmount ?? remainingBefore;
-    final isFullSettlement =
-        remainingBefore <= 0 || amountToPay >= remainingBefore - 0.009;
+  /// Total das Faturas de Cartão de Crédito no mês
+  double monthCardExpense([String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    double sum = 0.0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.expense &&
+          t.paymentMethod == PaymentMethod.creditCard) {
+        sum += t.amount;
+      }
+    }
+    return sum;
+  }
 
-    // 1. Cria transação de pagamento de fatura vinculada à conta e à competência
-    if (amountToPay > 0) {
-      final paymentTx = TransactionModel(
-        id: _uuid.v4(),
-        title: isFullSettlement
-            ? 'Pagamento Fatura ${card.name} ($yearMonth)'
-            : 'Pagamento Parcial Fatura ${card.name} ($yearMonth)',
-        amount: amountToPay,
-        type: TransactionType.transfer,
-        date: DateTime.now(),
-        competenceMonth: yearMonth,
-        status: TransactionStatus.paid,
-        accountId: sourceAccountId,
-        cardId: card.id,
-        isInvoicePayment: true,
+  /// Total de Saídas do mês (Gastos à Vista + Faturas do Mês)
+  double monthTotalExpense([String? ym]) {
+    return monthCashExpense(ym) + monthCardExpense(ym);
+  }
+
+  /// Quanto Sobra no Mês (Receitas - Total de Saídas)
+  double monthBalance([String? ym]) {
+    return monthIncome(ym) - monthTotalExpense(ym);
+  }
+
+  /// Total da fatura de um cartão específico no mês
+  double cardInvoiceTotal(String cardId, [String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    double sum = 0.0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.expense &&
+          t.paymentMethod == PaymentMethod.creditCard &&
+          t.cardId == cardId) {
+        sum += t.amount;
+      }
+    }
+    return sum;
+  }
+
+  /// Quantidade de lançamentos na fatura de um cartão no mês
+  int cardInvoiceCount(String cardId, [String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    int count = 0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.expense &&
+          t.paymentMethod == PaymentMethod.creditCard &&
+          t.cardId == cardId) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /// Resumo de despesas por categoria no mês (À Vista + Cartão)
+  List<CategoryExpenseSummary> expensesByCategory([String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    final totalExp = monthTotalExpense(target);
+    if (totalExp <= 0) return const [];
+
+    final Map<String, double> sums = {};
+    final Map<String, int> counts = {};
+
+    for (final t in _transactions) {
+      if (t.competenceMonth == target && t.type == TransactionType.expense) {
+        sums[t.categoryId] = (sums[t.categoryId] ?? 0.0) + t.amount;
+        counts[t.categoryId] = (counts[t.categoryId] ?? 0) + 1;
+      }
+    }
+
+    final result = <CategoryExpenseSummary>[];
+    double positiveCatTotal = 0.0;
+    sums.forEach((_, amount) {
+      if (amount > 0) positiveCatTotal += amount;
+    });
+    if (positiveCatTotal <= 0) return const [];
+
+    sums.forEach((catId, amount) {
+      if (amount <= 0.005) return;
+      result.add(
+        CategoryExpenseSummary(
+          category: categoryById(catId),
+          amount: amount,
+          percentage: (amount / positiveCatTotal).clamp(0.0, 1.0),
+          count: counts[catId] ?? 1,
+        ),
       );
-      _transactions.insert(0, paymentTx);
-      await DatabaseService.saveTransaction(paymentTx);
+    });
+
+    result.sort((a, b) => b.amount.compareTo(a.amount));
+    return result;
+  }
+
+  // ==================== OPERAÇÕES DE LANÇAMENTOS ====================
+
+  /// Divide um valor total em N parcelas exatas em centavos (a 1ª parcela absorve eventual diferença de centavos).
+  static List<double> splitInstallments(double totalAmount, int installments) {
+    if (installments <= 1) return [totalAmount];
+    final totalCents = (totalAmount * 100).round();
+    final baseCents = totalCents ~/ installments;
+    final remainderCents = totalCents - (baseCents * installments);
+    return List<double>.generate(installments, (index) {
+      final cents = index == 0 ? baseCents + remainderCents : baseCents;
+      return cents / 100.0;
+    });
+  }
+
+  /// Cria um novo lançamento (à vista, parcelado no cartão ou fixo mensal).
+  Future<void> createTransaction({
+    required String title,
+    required double totalAmount,
+    required DateTime date,
+    required TransactionType type,
+    required PaymentMethod paymentMethod,
+    required String categoryId,
+    String? cardId,
+    required String firstCompetenceMonth,
+    int installments = 1,
+    bool isRecurring = false,
+  }) async {
+    final cleanTitle = title.trim();
+    final effectivePayment =
+        type == TransactionType.income ? PaymentMethod.cash : paymentMethod;
+    final effectiveCardId =
+        effectivePayment == PaymentMethod.creditCard ? cardId : null;
+
+    final List<TransactionItem> toSave = [];
+
+    if (effectivePayment == PaymentMethod.creditCard && installments > 1) {
+      // Compra parcelada no cartão: divide em N faturas consecutivas
+      final groupId = _uuid.v4();
+      final parts = splitInstallments(totalAmount, installments);
+      for (int i = 0; i < installments; i++) {
+        final targetMonth = AppFormatters.addMonths(firstCompetenceMonth, i);
+        toSave.add(
+          TransactionItem(
+            id: _uuid.v4(),
+            title: cleanTitle,
+            amount: parts[i],
+            date: date,
+            competenceMonth: targetMonth,
+            type: TransactionType.expense,
+            paymentMethod: PaymentMethod.creditCard,
+            categoryId: categoryId,
+            cardId: effectiveCardId,
+            groupId: groupId,
+            installmentIndex: i + 1,
+            installmentTotal: installments,
+            isRecurring: false,
+          ),
+        );
+      }
+    } else if (isRecurring) {
+      // Lançamento fixo mensal: gera 12 meses consecutivos com mesmo groupId
+      final groupId = _uuid.v4();
+      for (int i = 0; i < 12; i++) {
+        final targetMonth = AppFormatters.addMonths(firstCompetenceMonth, i);
+        final recurringDate = DateTime(
+          date.year,
+          date.month + i,
+          date.day,
+        );
+        toSave.add(
+          TransactionItem(
+            id: _uuid.v4(),
+            title: cleanTitle,
+            amount: totalAmount,
+            date: recurringDate,
+            competenceMonth: targetMonth,
+            type: type,
+            paymentMethod: effectivePayment,
+            categoryId: categoryId,
+            cardId: effectiveCardId,
+            groupId: groupId,
+            installmentIndex: 1,
+            installmentTotal: 1,
+            isRecurring: true,
+          ),
+        );
+      }
+    } else {
+      // Lançamento único (à vista ou 1x no cartão)
+      toSave.add(
+        TransactionItem(
+          id: _uuid.v4(),
+          title: cleanTitle,
+          amount: totalAmount,
+          date: date,
+          competenceMonth: firstCompetenceMonth,
+          type: type,
+          paymentMethod: effectivePayment,
+          categoryId: categoryId,
+          cardId: effectiveCardId,
+          groupId: null,
+          installmentIndex: 1,
+          installmentTotal: 1,
+          isRecurring: false,
+        ),
+      );
     }
 
-    // 2. Só marca as compras da fatura como pagas quando o saldo é quitado integralmente
-    if (isFullSettlement) {
-      final updatedTxs = <TransactionModel>[];
-      for (int i = 0; i < _transactions.length; i++) {
-        final t = _transactions[i];
-        if (t.cardId == card.id &&
-            t.competenceMonth == yearMonth &&
-            !t.isInvoicePayment &&
-            t.status != TransactionStatus.paid) {
-          final updated = t.copyWith(status: TransactionStatus.paid);
-          _transactions[i] = updated;
-          updatedTxs.add(updated);
+    await DatabaseService.instance.upsertTransactionsBatch(toSave);
+    _transactions.addAll(toSave);
+    _sortTransactions();
+    notifyListeners();
+  }
+
+  /// Atualiza um lançamento existente (e opcionalmente os próximos do mesmo grupo se for recorrente/parcelado).
+  Future<void> updateTransaction(
+    TransactionItem updated, {
+    bool applyToFutureInGroup = false,
+  }) async {
+    final List<TransactionItem> toSave = [updated];
+
+    if (applyToFutureInGroup && updated.groupId != null) {
+      for (final tx in _transactions) {
+        if (tx.groupId == updated.groupId &&
+            tx.id != updated.id &&
+            tx.competenceMonth.compareTo(updated.competenceMonth) > 0) {
+          toSave.add(
+            tx.copyWith(
+              title: updated.title,
+              amount: updated.amount,
+              categoryId: updated.categoryId,
+              cardId: updated.cardId,
+              paymentMethod: updated.paymentMethod,
+            ),
+          );
         }
       }
-      await DatabaseService.saveTransactionsBatch(updatedTxs);
-
-      final totalPaid = getInvoicePaidAmount(card.id, yearMonth);
-      final inv = CreditCardInvoice(
-        id: 'inv_${card.id}_$yearMonth',
-        cardId: card.id,
-        yearMonth: yearMonth,
-        status: InvoiceStatus.paid,
-        paidAmount: totalPaid > 0 ? totalPaid : amountToPay,
-        paidAt: DateTime.now(),
-      );
-      final idx = _invoices.indexWhere((i) => i.id == inv.id);
-      if (idx >= 0) {
-        _invoices[idx] = inv;
-      } else {
-        _invoices.add(inv);
-      }
-      await DatabaseService.saveInvoice(inv);
     }
 
-    await _recalculateAccountBalances();
-    await _persistFallbackIfNeeded();
+    await DatabaseService.instance.upsertTransactionsBatch(toSave);
+    for (final item in toSave) {
+      final idx = _transactions.indexWhere((t) => t.id == item.id);
+      if (idx >= 0) {
+        _transactions[idx] = item;
+      }
+    }
+    _sortTransactions();
     notifyListeners();
   }
 
-  // --- Categorias ---
-  CategoryModel? getCategoryById(String? id) {
-    if (id == null) return null;
-    for (final c in _categories) {
-      if (c.id == id) return c;
+  /// Exclui um lançamento (ou ele + futuros do mesmo grupo de parcelas/fixas).
+  Future<void> deleteTransaction(
+    TransactionItem item, {
+    bool deleteFutureInGroup = false,
+  }) async {
+    final List<String> idsToDelete = [item.id];
+    if (deleteFutureInGroup && item.groupId != null) {
+      for (final tx in _transactions) {
+        if (tx.groupId == item.groupId &&
+            tx.id != item.id &&
+            tx.competenceMonth.compareTo(item.competenceMonth) >= 0) {
+          idsToDelete.add(tx.id);
+        }
+      }
     }
-    return null;
+    await DatabaseService.instance.deleteTransactionIds(idsToDelete);
+    final set = idsToDelete.toSet();
+    _transactions.removeWhere((t) => set.contains(t.id));
+    notifyListeners();
   }
 
-  Future<void> saveCategory(CategoryModel cat) async {
-    final idx = _categories.indexWhere((c) => c.id == cat.id);
-    if (idx >= 0) {
-      _categories[idx] = cat;
-    } else {
-      _categories.add(cat);
+  /// Salva em lote os candidatos selecionados no Importador Unificado.
+  /// Retorna a quantidade de lançamentos criados (incluindo parcelas futuras projetadas).
+  Future<int> commitImportedCandidates({
+    required List<ImportCandidate> candidates,
+    required String selectedInvoiceMonth,
+  }) async {
+    final toSave = <TransactionItem>[];
+
+    for (final c in candidates) {
+      if (!c.selected || c.amount <= 0) continue;
+
+      if (c.destination == ImportDestinationType.checking) {
+        final txType =
+            c.isCreditOrRefund ? TransactionType.income : TransactionType.expense;
+        toSave.add(
+          TransactionItem(
+            id: _uuid.v4(),
+            title: c.title.trim(),
+            amount: c.amount,
+            date: c.date,
+            competenceMonth: AppFormatters.yearMonthFromDate(c.date),
+            type: txType,
+            paymentMethod: PaymentMethod.cash,
+            categoryId: c.categoryId,
+            cardId: null,
+            groupId: null,
+            installmentIndex: 1,
+            installmentTotal: 1,
+            isRecurring: false,
+          ),
+        );
+      } else {
+        // Fatura de Cartão de Crédito
+        final effectiveCardId =
+            c.cardId ?? (_cards.isNotEmpty ? _cards.first.id : null);
+        // Estorno/crédito na fatura entra com valor negativo para abater do total da fatura
+        final signedExpenseAmount =
+            c.isCreditOrRefund ? -c.amount : c.amount;
+
+        final hasMultiInstallments =
+            !c.isCreditOrRefund && c.installmentTotal > 1;
+        final groupId = hasMultiInstallments ? _uuid.v4() : null;
+
+        toSave.add(
+          TransactionItem(
+            id: _uuid.v4(),
+            title: c.title.trim(),
+            amount: signedExpenseAmount,
+            date: c.date,
+            competenceMonth: selectedInvoiceMonth,
+            type: TransactionType.expense,
+            paymentMethod: PaymentMethod.creditCard,
+            categoryId: c.categoryId,
+            cardId: effectiveCardId,
+            groupId: groupId,
+            installmentIndex: hasMultiInstallments ? c.installmentIndex : 1,
+            installmentTotal: hasMultiInstallments ? c.installmentTotal : 1,
+            isRecurring: false,
+          ),
+        );
+
+        // Projeção automática das parcelas restantes nos meses futuros
+        if (hasMultiInstallments &&
+            c.projectFutureInstallments &&
+            c.installmentIndex < c.installmentTotal) {
+          for (int nextIdx = c.installmentIndex + 1;
+              nextIdx <= c.installmentTotal;
+              nextIdx++) {
+            final offset = nextIdx - c.installmentIndex;
+            final futureMonth =
+                AppFormatters.addMonths(selectedInvoiceMonth, offset);
+
+            final alreadyExists = ImportService.isDuplicateTransaction(
+              title: c.title,
+              amount: c.amount,
+              date: c.date,
+              targetMonth: futureMonth,
+              destination: ImportDestinationType.creditCard,
+              cardId: effectiveCardId,
+              installmentIndex: nextIdx,
+              installmentTotal: c.installmentTotal,
+              existingTransactions: _transactions,
+            );
+
+            if (!alreadyExists) {
+              toSave.add(
+                TransactionItem(
+                  id: _uuid.v4(),
+                  title: c.title.trim(),
+                  amount: c.amount,
+                  date: c.date,
+                  competenceMonth: futureMonth,
+                  type: TransactionType.expense,
+                  paymentMethod: PaymentMethod.creditCard,
+                  categoryId: c.categoryId,
+                  cardId: effectiveCardId,
+                  groupId: groupId,
+                  installmentIndex: nextIdx,
+                  installmentTotal: c.installmentTotal,
+                  isRecurring: false,
+                ),
+              );
+            }
+          }
+        }
+      }
     }
-    await DatabaseService.saveCategory(cat);
-    await _persistFallbackIfNeeded();
+
+    if (toSave.isEmpty) return 0;
+
+    await DatabaseService.instance.upsertTransactionsBatch(toSave);
+    _transactions.addAll(toSave);
+    _sortTransactions();
+    notifyListeners();
+    return toSave.length;
+  }
+
+  // ==================== CARTÕES DE CRÉDITO & CATEGORIAS ====================
+
+  Future<void> saveCard({
+    String? id,
+    required String name,
+    required int colorValue,
+    required int closingDay,
+    required int dueDay,
+  }) async {
+    final card = CreditCardItem(
+      id: id ?? _uuid.v4(),
+      name: name.trim(),
+      colorValue: colorValue,
+      closingDay: closingDay.clamp(1, 31),
+      dueDay: dueDay.clamp(1, 31),
+    );
+    await DatabaseService.instance.upsertCard(card);
+    final idx = _cards.indexWhere((c) => c.id == card.id);
+    if (idx >= 0) {
+      _cards[idx] = card;
+    } else {
+      _cards.add(card);
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteCard(String id) async {
+    await DatabaseService.instance.deleteCard(id);
+    _cards.removeWhere((c) => c.id == id);
+    _transactions.removeWhere((t) => t.cardId == id);
+    if (_extratoFilter == 'card:$id') {
+      _extratoFilter = null;
+    }
+    notifyListeners();
+  }
+
+  Future<void> saveCategory({
+    String? id,
+    required String name,
+    required String iconKey,
+    required int colorValue,
+    required TransactionType type,
+  }) async {
+    final category = CategoryItem(
+      id: id ?? _uuid.v4(),
+      name: name.trim(),
+      iconKey: iconKey,
+      colorValue: colorValue,
+      type: type,
+    );
+    await DatabaseService.instance.upsertCategory(category);
+    final idx = _categories.indexWhere((c) => c.id == category.id);
+    if (idx >= 0) {
+      _categories[idx] = category;
+    } else {
+      _categories.add(category);
+    }
     notifyListeners();
   }
 
   Future<void> deleteCategory(String id) async {
-    _categories.removeWhere((c) => c.id == id && !c.isSystem);
-    await DatabaseService.deleteCategory(id);
-    await _persistFallbackIfNeeded();
+    await DatabaseService.instance.deleteCategory(id);
+    _categories.removeWhere((c) => c.id == id);
     notifyListeners();
   }
 
-  // --- Transações (com suporte a Parcelamento 1x..48x e Recorrência) ---
-  Future<void> addOrUpdateTransaction(
-    TransactionModel baseTx, {
-    int installments = 1,
-  }) async {
-    final existingIdx = _transactions.indexWhere((t) => t.id == baseTx.id);
+  // ==================== BACKUP JSON & RESET ====================
 
-    if (existingIdx >= 0 || installments <= 1) {
-      if (existingIdx >= 0) {
-        _transactions[existingIdx] = baseTx;
-      } else {
-        _transactions.insert(0, baseTx);
-      }
-      await DatabaseService.saveTransaction(baseTx);
-    } else {
-      // Criação de compra parcelada (1/N .. N/N) alocando cada parcela na competência correta
-      final groupId = _uuid.v4();
-      final perInstallment =
-          double.parse((baseTx.amount / installments).toStringAsFixed(2));
-      final card = getCardById(baseTx.cardId);
-
-      final baseCompetence = card != null
-          ? card.computeCompetenceMonth(baseTx.date)
-          : baseTx.competenceMonth;
-      final compParts = baseCompetence.split('-');
-      int baseYear = int.parse(compParts[0]);
-      int baseMonth = int.parse(compParts[1]);
-
-      for (int i = 0; i < installments; i++) {
-        int y = baseYear;
-        int m = baseMonth + i;
-        while (m > 12) {
-          m -= 12;
-          y += 1;
-        }
-        final compYm = '$y-${m.toString().padLeft(2, '0')}';
-        final installmentDate = DateTime(
-          baseTx.date.year,
-          baseTx.date.month + i,
-          baseTx.date.day,
-        );
-
-        // Ajuste de centavos na primeira parcela
-        final exactAmount = i == 0
-            ? double.parse(
-                (baseTx.amount - perInstallment * (installments - 1))
-                    .toStringAsFixed(2),
-              )
-            : perInstallment;
-
-        final item = baseTx.copyWith(
-          id: i == 0 ? baseTx.id : _uuid.v4(),
-          title: baseTx.title,
-          amount: exactAmount,
-          date: installmentDate,
-          competenceMonth: compYm,
-          status: baseTx.isCreditCard
-              ? TransactionStatus.pending
-              : (i == 0 ? baseTx.status : TransactionStatus.pending),
-          installmentGroupId: groupId,
-          installmentIndex: i + 1,
-          installmentTotal: installments,
-        );
-        _transactions.insert(0, item);
-        await DatabaseService.saveTransaction(item);
-      }
-    }
-
-    // Se a transação está vinculada a uma Meta (Caixinha), atualiza o saldo da meta
-    if (baseTx.goalId != null) {
-      await _recalculateGoals();
-    }
-
-    _transactions.sort((a, b) => b.date.compareTo(a.date));
-    await _recalculateAccountBalances();
-    await _persistFallbackIfNeeded();
-
-    // Verifica limite de orçamento para alertar 80% / 100%
-    if (baseTx.type == TransactionType.expense &&
-        !baseTx.isIgnored &&
-        !baseTx.isThirdParty &&
-        baseTx.categoryId != null) {
-      await _checkBudgetThresholdAlert(
-        baseTx.categoryId!,
-        baseTx.effectiveMonth(_budgetRegime),
-      );
-    }
-
-    notifyListeners();
-  }
-
-  /// Insere um lote de transações em operação única (evita N recálculos e N gravações).
-  Future<void> addTransactionsBatch(List<TransactionModel> txs) async {
-    if (txs.isEmpty) return;
-    for (final tx in txs) {
-      final existingIdx = _transactions.indexWhere((t) => t.id == tx.id);
-      if (existingIdx >= 0) {
-        _transactions[existingIdx] = tx;
-      } else {
-        _transactions.insert(0, tx);
-      }
-    }
-    await DatabaseService.saveTransactionsBatch(txs);
-    _transactions.sort((a, b) => b.date.compareTo(a.date));
-    await _recalculateGoals();
-    await _recalculateAccountBalances();
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  /// Marca/desmarca uma transação como ignorada (fora de saldos, categorias,
-  /// insights, fatura e totais). Em parcelados, pode estender às parcelas futuras.
-  Future<void> setTransactionIgnored(
-    TransactionModel tx,
-    bool ignored, {
-    bool includeFutureInstallments = false,
-  }) async {
-    for (int i = 0; i < _transactions.length; i++) {
-      final t = _transactions[i];
-      final isSame = t.id == tx.id;
-      final isFuture = includeFutureInstallments &&
-          tx.installmentGroupId != null &&
-          t.installmentGroupId == tx.installmentGroupId &&
-          t.installmentIndex > tx.installmentIndex;
-      if (isSame || isFuture) {
-        final updated = t.copyWith(isIgnored: ignored);
-        _transactions[i] = updated;
-        await DatabaseService.saveTransaction(updated);
-      }
-    }
-    await _recalculateAccountBalances();
-    await _recalculateGoals();
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  Future<void> toggleTransactionPaid(TransactionModel tx) async {
-    final nextStatus = tx.status == TransactionStatus.paid
-        ? TransactionStatus.pending
-        : TransactionStatus.paid;
-    final updated = tx.copyWith(status: nextStatus);
-    await addOrUpdateTransaction(updated);
-  }
-
-  Future<void> deleteTransaction(
-    TransactionModel tx, {
-    bool deleteAllInstallments = false,
-  }) async {
-    if (deleteAllInstallments && tx.installmentGroupId != null) {
-      _transactions.removeWhere(
-        (t) => t.installmentGroupId == tx.installmentGroupId,
-      );
-      await DatabaseService.deleteInstallmentGroup(tx.installmentGroupId!);
-    } else {
-      _transactions.removeWhere((t) => t.id == tx.id);
-      await DatabaseService.deleteTransaction(tx.id);
-    }
-    await _recalculateAccountBalances();
-    await _recalculateGoals();
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  Future<void> _recalculateAccountBalances() async {
-    final changedAccounts = <Account>[];
-    for (int i = 0; i < _accounts.length; i++) {
-      final acc = _accounts[i];
-      double bal = acc.initialBalance;
-
-      for (final t in _transactions) {
-        if (t.isIgnored) continue;
-        if (t.status != TransactionStatus.paid) continue;
-        if (t.isCreditCard && !t.isInvoicePayment) continue;
-
-        if (t.type == TransactionType.income && t.accountId == acc.id) {
-          bal += t.amount;
-        } else if (t.type == TransactionType.expense &&
-            t.accountId == acc.id) {
-          bal -= t.amount;
-        } else if (t.type == TransactionType.transfer) {
-          if (t.accountId == acc.id) bal -= t.amount;
-          if (t.destinationAccountId == acc.id) bal += t.amount;
-        }
-      }
-
-      if ((acc.currentBalance - bal).abs() > 0.0001) {
-        final updated = acc.copyWith(currentBalance: bal);
-        _accounts[i] = updated;
-        changedAccounts.add(updated);
-      }
-    }
-    await DatabaseService.saveAccountsBatch(changedAccounts);
-  }
-
-  Future<void> _recalculateGoals() async {
-    final changedGoals = <GoalModel>[];
-    for (int i = 0; i < _goals.length; i++) {
-      final g = _goals[i];
-      double sum = g.initialBalance;
-      for (final t in _transactions) {
-        if (t.goalId == g.id &&
-            !t.isIgnored &&
-            t.status == TransactionStatus.paid) {
-          final isContribution = t.tags.contains('cofrinho_aporte') ||
-              t.tags.contains('rendimento_cofrinho') ||
-              t.categoryId == 'cat_rendimentos';
-          final isWithdrawal = t.tags.contains('resgate_cofrinho') ||
-              (t.type == TransactionType.expense && !isContribution) ||
-              (t.type == TransactionType.income && !isContribution);
-          if (isWithdrawal) {
-            sum -= t.amount;
-          } else {
-            sum += t.amount;
-          }
-        }
-      }
-      final clamped = sum.clamp(0.0, double.infinity);
-      if ((g.currentAmount - clamped).abs() > 0.0001) {
-        final updated = g.copyWith(currentAmount: clamped);
-        _goals[i] = updated;
-        changedGoals.add(updated);
-      }
-    }
-    await DatabaseService.saveGoalsBatch(changedGoals);
-  }
-
-  // --- Orçamentos (Budgets) e Metas (Goals) ---
-  BudgetModel? getBudgetForCategory(String categoryId, String yearMonth) {
-    for (final b in _budgets) {
-      if (b.categoryId == categoryId && b.yearMonth == yearMonth) {
-        return b;
-      }
-    }
-    return null;
-  }
-
-  Future<void> saveBudget({
-    required String categoryId,
-    required String yearMonth,
-    required double limitAmount,
-  }) async {
-    final existing = getBudgetForCategory(categoryId, yearMonth);
-    final budget = BudgetModel(
-      id: existing?.id ?? 'b_${categoryId}_$yearMonth',
-      categoryId: categoryId,
-      yearMonth: yearMonth,
-      limitAmount: limitAmount,
-    );
-    final idx = _budgets.indexWhere((b) => b.id == budget.id);
-    if (limitAmount <= 0) {
-      if (idx >= 0) _budgets.removeAt(idx);
-      await DatabaseService.deleteBudget(budget.id);
-    } else {
-      if (idx >= 0) {
-        _budgets[idx] = budget;
-      } else {
-        _budgets.add(budget);
-      }
-      await DatabaseService.saveBudget(budget);
-    }
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  Future<void> _checkBudgetThresholdAlert(
-    String categoryId,
-    String yearMonth,
-  ) async {
-    final budget = getBudgetForCategory(categoryId, yearMonth);
-    if (budget == null || budget.limitAmount <= 0) return;
-
-    final cat = getCategoryById(categoryId);
-    if (cat == null) return;
-
-    final spent = getCategorySpent(categoryId, yearMonth);
-    final ratio = spent / budget.limitAmount;
-    if (ratio >= 0.80) {
-      await NotificationService.instance.notifyBudgetThreshold(
-        categoryName: cat.name,
-        percentage: ratio,
-        spent: spent,
-        limit: budget.limitAmount,
-      );
-    }
-  }
-
-  Future<void> saveGoal(GoalModel goal) async {
-    final idx = _goals.indexWhere((g) => g.id == goal.id);
-    if (idx >= 0) {
-      _goals[idx] = goal;
-    } else {
-      _goals.add(goal);
-    }
-    await DatabaseService.saveGoal(goal);
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  Future<void> addContributionToGoal(GoalModel goal, double delta) async {
-    final updated = goal.copyWith(
-      initialBalance: (goal.initialBalance + delta).clamp(0.0, double.infinity),
-      currentAmount: (goal.currentAmount + delta).clamp(0.0, double.infinity),
-    );
-    await saveGoal(updated);
-  }
-
-  Future<void> deleteGoal(String id) async {
-    _goals.removeWhere((g) => g.id == id);
-    await DatabaseService.deleteGoal(id);
-    await _persistFallbackIfNeeded();
-    notifyListeners();
-  }
-
-  // --- Cálculos Financeiros do Mês e Patrimônio Líquido ---
-  /// Transações do mês. Por padrão exclui as ignoradas (fora de totais, categorias e insights).
-  List<TransactionModel> transactionsForMonth(
-    String yearMonth, {
-    bool includeIgnored = false,
-  }) {
-    return _transactions
-        .where((t) =>
-            t.effectiveMonth(_budgetRegime) == yearMonth &&
-            (includeIgnored || !t.isIgnored))
-        .toList();
-  }
-
-  double totalIncomeForMonth(String yearMonth, {bool onlyPaid = false}) {
-    return transactionsForMonth(yearMonth)
-        .where((t) =>
-            t.type == TransactionType.income &&
-            !t.isCreditCard &&
-            !t.isThirdParty &&
-            !t.tags.contains('resgate_cofrinho') &&
-            (!onlyPaid || t.status == TransactionStatus.paid))
-        .fold(0.0, (s, t) => s + t.amount);
-  }
-
-  double totalExpenseForMonth(String yearMonth, {bool onlyPaid = false}) {
-    return transactionsForMonth(yearMonth)
-        .where((t) =>
-            t.type == TransactionType.expense &&
-            !t.isInvoicePayment &&
-            !t.isThirdParty &&
-            !t.tags.contains('cofrinho_aporte') &&
-            (!onlyPaid ||
-                t.status == TransactionStatus.paid ||
-                t.isCreditCard))
-        .fold(0.0, (s, t) => s + t.amount);
-  }
-
-  double get liquidAccountsBalance {
-    return _accounts
-        .where((a) => !a.archived && a.type != AccountType.investment)
-        .fold(0.0, (s, a) => s + a.currentBalance);
-  }
-
-  double get investmentAccountsBalance {
-    return _accounts
-        .where((a) => !a.archived && a.type == AccountType.investment)
-        .fold(0.0, (s, a) => s + a.currentBalance);
-  }
-
-  double get totalCreditCardUnpaidDebt {
-    return _creditCards
-        .where((c) => !c.archived)
-        .fold(0.0, (s, c) => s + getCardUsedLimit(c.id));
-  }
-
-  double get goalsTotalBalance {
-    return _goals.fold(0.0, (s, g) => s + g.currentAmount);
-  }
-
-  double get netWorth {
-    final assets = _accounts
-        .where((a) => !a.archived && a.includeInNetWorth)
-        .fold(0.0, (s, a) => s + a.currentBalance);
-    return assets + goalsTotalBalance - totalCreditCardUnpaidDebt;
-  }
-
-  /// Saldo Projetado no Fim do Mês = Saldo Atual em Contas Líquidas + Receitas Pendentes do Mês - Despesas Pendentes do Mês - Saldo Restante de Faturas de Cartão do Mês
-  double projectedEndOfMonthBalance(String yearMonth) {
-    final monthTxs = transactionsForMonth(yearMonth);
-    final pendingCashExpense = monthTxs
-        .where((t) =>
-            t.type == TransactionType.expense &&
-            !t.isCreditCard &&
-            !t.tags.contains('cofrinho_aporte') &&
-            t.status == TransactionStatus.pending)
-        .fold(0.0, (s, t) => s + t.amount);
-
-    final pendingIncomeFiltered = monthTxs
-        .where((t) =>
-            t.type == TransactionType.income &&
-            !t.isCreditCard &&
-            !t.tags.contains('resgate_cofrinho') &&
-            t.status == TransactionStatus.pending)
-        .fold(0.0, (s, t) => s + t.amount);
-
-    final unpaidCardInvoicesThisMonth = _creditCards
-        .where((c) => !c.archived)
-        .fold(0.0, (s, c) => s + getInvoiceRemaining(c.id, yearMonth));
-
-    return liquidAccountsBalance +
-        pendingIncomeFiltered -
-        pendingCashExpense -
-        unpaidCardInvoicesThisMonth;
-  }
-
-  double getCategorySpent(String categoryId, String yearMonth) {
-    return transactionsForMonth(yearMonth)
-        .where((t) =>
-            t.type == TransactionType.expense &&
-            !t.isInvoicePayment &&
-            !t.isThirdParty &&
-            !t.tags.contains('cofrinho_aporte') &&
-            t.categoryId == categoryId)
-        .fold(0.0, (s, t) => s + t.amount);
-  }
-
-  Map<CategoryModel, double> categoryExpenseBreakdown(String yearMonth) {
-    final map = <CategoryModel, double>{};
-    for (final cat
-        in _categories.where((c) => c.type == TransactionType.expense)) {
-      final spent = getCategorySpent(cat.id, yearMonth);
-      if (spent > 0) {
-        map[cat] = spent;
-      }
-    }
-    final sortedEntries = map.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    return Map.fromEntries(sortedEntries);
-  }
-
-  List<String> get allUsedTags {
-    final set = <String>{};
-    for (final t in _transactions) {
-      set.addAll(t.tags);
-    }
-    final list = set.toList()..sort();
-    return list;
-  }
-
-  // --- Backup & Restore ---
-  Map<String, dynamic> exportBackupJson() {
-    return {
-      'app': 'neves_finance',
-      'version': 1,
-      'timestamp': DateTime.now().toIso8601String(),
-      'user_name': _userName,
-      'budget_regime': _budgetRegime.name,
-      'accounts': _accounts.map((e) => e.toMap()).toList(),
-      'credit_cards': _creditCards.map((e) => e.toMap()).toList(),
-      'invoices': _invoices.map((e) => e.toMap()).toList(),
-      'categories': _categories.map((e) => e.toMap()).toList(),
-      'transactions': _transactions.map((e) => e.toMap()).toList(),
-      'budgets': _budgets.map((e) => e.toMap()).toList(),
-      'goals': _goals.map((e) => e.toMap()).toList(),
+  String exportBackupJson() {
+    final payload = {
+      'app': 'neves_mvp',
+      'version': 2,
+      'exportedAt': DateTime.now().toIso8601String(),
+      'categories': _categories.map((c) => c.toMap()).toList(),
+      'cards': _cards.map((c) => c.toMap()).toList(),
+      'transactions': _transactions.map((t) => t.toMap()).toList(),
     };
+    return const JsonEncoder.withIndent('  ').convert(payload);
   }
 
-  BackupPreviewInfo inspectBackupJson(Map<String, dynamic> json) {
-    final ts = json['timestamp'] != null
-        ? DateTime.tryParse(json['timestamp'].toString())
-        : null;
-    final accs = (json['accounts'] as List?)?.length ?? 0;
-    final cards = (json['credit_cards'] as List?)?.length ?? 0;
-    final txs = (json['transactions'] as List?)?.length ?? 0;
-    final gls = (json['goals'] as List?)?.length ?? 0;
-    return BackupPreviewInfo(
-      timestamp: ts,
-      accountsCount: accs,
-      cardsCount: cards,
-      transactionsCount: txs,
-      goalsCount: gls,
+  Future<void> importBackupJson(String jsonString) async {
+    final decoded = jsonDecode(jsonString) as Map<String, dynamic>;
+    final rawCats = (decoded['categories'] as List<dynamic>?) ?? [];
+    final rawCards = (decoded['cards'] as List<dynamic>?) ?? [];
+    final rawTxs = (decoded['transactions'] as List<dynamic>?) ?? [];
+
+    final importedCats = rawCats
+        .map((e) => CategoryItem.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    final importedCards = rawCards
+        .map((e) => CreditCardItem.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    final importedTxs = rawTxs
+        .map(
+            (e) => TransactionItem.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
+
+    final finalCats = importedCats.isNotEmpty
+        ? importedCats
+        : CategoryItem.defaultCategories();
+
+    await DatabaseService.instance.replaceAllData(
+      categories: finalCats,
+      cards: importedCards,
+      transactions: importedTxs,
     );
-  }
 
-  Future<void> importBackupJson(
-    Map<String, dynamic> json, {
-    required bool merge,
-  }) async {
-    if (!merge) {
-      await DatabaseService.clearAllData();
-      _accounts.clear();
-      _creditCards.clear();
-      _invoices.clear();
-      _categories.clear();
-      _transactions.clear();
-      _budgets.clear();
-      _goals.clear();
-    }
-
-    if (json['user_name'] != null) {
-      await setUserName(json['user_name'].toString());
-    }
-    if (json['budget_regime'] != null) {
-      await setBudgetRegime(
-        BudgetRegime.fromString(json['budget_regime'].toString()),
-      );
-    }
-
-    for (final raw in (json['categories'] as List? ?? [])) {
-      final item = CategoryModel.fromMap(Map<String, dynamic>.from(raw as Map));
-      await saveCategory(item);
-    }
-    for (final raw in (json['accounts'] as List? ?? [])) {
-      final item = Account.fromMap(Map<String, dynamic>.from(raw as Map));
-      final idx = _accounts.indexWhere((a) => a.id == item.id);
-      if (idx >= 0) {
-        _accounts[idx] = item;
-      } else {
-        _accounts.add(item);
-      }
-      await DatabaseService.saveAccount(item);
-    }
-    for (final raw in (json['credit_cards'] as List? ?? [])) {
-      final item =
-          CreditCardModel.fromMap(Map<String, dynamic>.from(raw as Map));
-      await saveCreditCard(item);
-    }
-    for (final raw in (json['invoices'] as List? ?? [])) {
-      final item =
-          CreditCardInvoice.fromMap(Map<String, dynamic>.from(raw as Map));
-      final idx = _invoices.indexWhere((i) => i.id == item.id);
-      if (idx >= 0) {
-        _invoices[idx] = item;
-      } else {
-        _invoices.add(item);
-      }
-      await DatabaseService.saveInvoice(item);
-    }
-    for (final raw in (json['goals'] as List? ?? [])) {
-      final item = GoalModel.fromMap(Map<String, dynamic>.from(raw as Map));
-      await saveGoal(item);
-    }
-    for (final raw in (json['budgets'] as List? ?? [])) {
-      final item = BudgetModel.fromMap(Map<String, dynamic>.from(raw as Map));
-      await saveBudget(
-        categoryId: item.categoryId,
-        yearMonth: item.yearMonth,
-        limitAmount: item.limitAmount,
-      );
-    }
-    for (final raw in (json['transactions'] as List? ?? [])) {
-      final item =
-          TransactionModel.fromMap(Map<String, dynamic>.from(raw as Map));
-      final idx = _transactions.indexWhere((t) => t.id == item.id);
-      if (idx >= 0) {
-        _transactions[idx] = item;
-      } else {
-        _transactions.add(item);
-      }
-      await DatabaseService.saveTransaction(item);
-    }
-
-    _transactions.sort((a, b) => b.date.compareTo(a.date));
-    await _ensureSeeds();
-    await _recalculateGoals();
-    await _recalculateAccountBalances();
-    await _persistFallbackIfNeeded();
+    _categories = finalCats;
+    _cards = importedCards;
+    _transactions = importedTxs;
+    _sortTransactions();
     notifyListeners();
   }
 
-  /// Gera backup de segurança automático e reinicia a carteira para o estado inicial.
-  Future<void> resetWalletToDefaults() async {
-    await BackupService.instance.generateLocalBackup(this);
-    await DatabaseService.clearAllData();
-    _accounts.clear();
-    _creditCards.clear();
-    _invoices.clear();
-    _categories.clear();
-    _transactions.clear();
-    _budgets.clear();
-    _goals.clear();
-    if (_prefs != null) {
-      for (final key in [
-        'neves_accounts',
-        'neves_cards',
-        'neves_invoices',
-        'neves_categories',
-        'neves_transactions',
-        'neves_budgets',
-        'neves_goals',
-      ]) {
-        await _prefs!.remove(key);
-      }
-    }
-    await _ensureSeeds();
-    notifyListeners();
-  }
+  Future<void> resetAllData() async {
+    final defaultCats = CategoryItem.defaultCategories();
+    final defaultCards = CreditCardItem.defaultCards();
 
-  @override
-  void dispose() {
-    themeModeNotifier.dispose();
-    super.dispose();
+    await DatabaseService.instance.replaceAllData(
+      categories: defaultCats,
+      cards: defaultCards,
+      transactions: const [],
+    );
+
+    _categories = defaultCats;
+    _cards = defaultCards;
+    _transactions = [];
+    _extratoFilter = null;
+    notifyListeners();
   }
 }

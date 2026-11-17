@@ -1,491 +1,393 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/models.dart';
 
 class DatabaseService {
-  static Database? _database;
+  static final DatabaseService instance = DatabaseService._();
+  DatabaseService._();
 
-  static bool get isAvailable => _database != null && _database!.isOpen;
+  static const _prefFallbackCats = 'neves_mvp_fb_categories';
+  static const _prefFallbackCards = 'neves_mvp_fb_cards';
+  static const _prefFallbackTxs = 'neves_mvp_fb_transactions';
 
-  static Database? get db => _database;
+  Database? _db;
+  bool _inMemoryMode = false;
+  bool _isTestMode = false;
+  bool _fallbackLoaded = false;
 
-  // Fallback em memória para testes ou ambientes web/desktop sem driver nativo
-  @visibleForTesting
-  static final Map<String, String> inMemoryAiInsights = {};
+  final List<CategoryItem> _memCategories = [];
+  final List<CreditCardItem> _memCards = [];
+  final List<TransactionItem> _memTransactions = [];
 
-  static Future<void> init({Database? customDb}) async {
-    if (customDb != null) {
-      _database = customDb;
-      return;
+  void enableInMemoryModeForTest() {
+    _inMemoryMode = true;
+    _isTestMode = true;
+    _fallbackLoaded = true;
+    _memCategories
+      ..clear()
+      ..addAll(CategoryItem.defaultCategories());
+    _memCards
+      ..clear()
+      ..addAll(CreditCardItem.defaultCards());
+    _memTransactions.clear();
+  }
+
+  Future<Database?> get database async {
+    if (_inMemoryMode || kIsWeb) {
+      await _ensureFallbackInitialized();
+      return null;
     }
-
-    if (_database != null && _database!.isOpen) return;
-
+    if (_db != null) return _db;
     try {
       final dbPath = await getDatabasesPath();
-      final path = p.join(dbPath, 'neves_finance.db');
-
-      _database = await openDatabase(
-        path,
-        version: 2,
-        onCreate: _onCreate,
-        onUpgrade: (db, oldVersion, newVersion) async {
-          await _ensureTables(db);
-        },
-        onOpen: (db) async {
-          await _ensureTables(db);
+      final fullPath = p.join(dbPath, 'neves_mvp_v2.db');
+      _db = await openDatabase(
+        fullPath,
+        version: 1,
+        onCreate: (db, version) async {
+          await _createSchema(db);
+          await _seedDefaults(db);
         },
       );
+      return _db;
     } catch (_) {
-      _database = null;
-    }
-  }
-
-  static Future<void> _onCreate(Database db, int version) async {
-    await _ensureTables(db);
-  }
-
-  static Future<void> _ensureTables(Database db) async {
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS accounts (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL,
-        initial_balance REAL NOT NULL,
-        current_balance REAL NOT NULL,
-        color_value INTEGER NOT NULL,
-        icon_name TEXT NOT NULL,
-        include_in_net_worth INTEGER NOT NULL DEFAULT 1,
-        archived INTEGER NOT NULL DEFAULT 0
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS credit_cards (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        credit_limit REAL NOT NULL,
-        closing_day INTEGER NOT NULL,
-        due_day INTEGER NOT NULL,
-        default_account_id TEXT,
-        color_value INTEGER NOT NULL,
-        archived INTEGER NOT NULL DEFAULT 0
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS invoices (
-        id TEXT PRIMARY KEY,
-        card_id TEXT NOT NULL,
-        year_month TEXT NOT NULL,
-        status TEXT NOT NULL,
-        paid_amount REAL NOT NULL DEFAULT 0,
-        paid_at TEXT
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS categories (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL,
-        pillar_503020 TEXT NOT NULL,
-        color_value INTEGER NOT NULL,
-        icon_name TEXT NOT NULL,
-        is_system INTEGER NOT NULL DEFAULT 0
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS transactions (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        amount REAL NOT NULL,
-        type TEXT NOT NULL,
-        date_iso TEXT NOT NULL,
-        competence_month TEXT NOT NULL,
-        status TEXT NOT NULL,
-        account_id TEXT,
-        destination_account_id TEXT,
-        card_id TEXT,
-        category_id TEXT,
-        goal_id TEXT,
-        installment_group_id TEXT,
-        installment_index INTEGER NOT NULL DEFAULT 1,
-        installment_total INTEGER NOT NULL DEFAULT 1,
-        recurrence_rule TEXT NOT NULL DEFAULT 'none',
-        tags_json TEXT NOT NULL DEFAULT '[]',
-        notes TEXT,
-        import_hash TEXT,
-        is_invoice_payment INTEGER NOT NULL DEFAULT 0,
-        is_ignored INTEGER NOT NULL DEFAULT 0,
-        is_third_party INTEGER NOT NULL DEFAULT 0
-      )
-    ''');
-
-    // Migração: adiciona colunas novas em bancos já existentes.
-    final txCols = await db.rawQuery('PRAGMA table_info(transactions)');
-    if (!txCols.any((c) => c['name'] == 'is_ignored')) {
-      await db.execute(
-        'ALTER TABLE transactions ADD COLUMN is_ignored INTEGER NOT NULL DEFAULT 0',
-      );
-    }
-    if (!txCols.any((c) => c['name'] == 'is_third_party')) {
-      await db.execute(
-        'ALTER TABLE transactions ADD COLUMN is_third_party INTEGER NOT NULL DEFAULT 0',
-      );
-    }
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS budgets (
-        id TEXT PRIMARY KEY,
-        category_id TEXT NOT NULL,
-        year_month TEXT NOT NULL,
-        limit_amount REAL NOT NULL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS goals (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        target_amount REAL NOT NULL,
-        initial_balance REAL NOT NULL DEFAULT 0,
-        current_amount REAL NOT NULL,
-        target_date_iso TEXT,
-        color_value INTEGER NOT NULL,
-        icon_name TEXT NOT NULL
-      )
-    ''');
-
-    final goalCols = await db.rawQuery('PRAGMA table_info(goals)');
-    if (!goalCols.any((c) => c['name'] == 'initial_balance')) {
-      await db.execute(
-        'ALTER TABLE goals ADD COLUMN initial_balance REAL NOT NULL DEFAULT 0',
-      );
-    }
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS ai_insights (
-        id TEXT PRIMARY KEY,
-        year_month TEXT NOT NULL UNIQUE,
-        content_md TEXT NOT NULL,
-        model TEXT NOT NULL,
-        created_at_iso TEXT NOT NULL
-      )
-    ''');
-  }
-
-  // --- Accounts ---
-  static Future<List<Account>> getAccounts() async {
-    if (!isAvailable) return [];
-    try {
-      final rows = await _database!.query('accounts');
-      return rows.map((r) => Account.fromMap(r)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static Future<void> saveAccount(Account account) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.insert(
-        'accounts',
-        account.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (_) {}
-  }
-
-  static Future<void> saveAccountsBatch(List<Account> accounts) async {
-    if (!isAvailable || accounts.isEmpty) return;
-    try {
-      final batch = _database!.batch();
-      for (final account in accounts) {
-        batch.insert(
-          'accounts',
-          account.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-      await batch.commit(noResult: true);
-    } catch (_) {}
-  }
-
-  static Future<void> deleteAccount(String id) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.delete('accounts', where: 'id = ?', whereArgs: [id]);
-    } catch (_) {}
-  }
-
-  // --- Credit Cards ---
-  static Future<List<CreditCardModel>> getCreditCards() async {
-    if (!isAvailable) return [];
-    try {
-      final rows = await _database!.query('credit_cards');
-      return rows.map((r) => CreditCardModel.fromMap(r)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static Future<void> saveCreditCard(CreditCardModel card) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.insert(
-        'credit_cards',
-        card.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (_) {}
-  }
-
-  static Future<void> deleteCreditCard(String id) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.delete('credit_cards', where: 'id = ?', whereArgs: [id]);
-    } catch (_) {}
-  }
-
-  // --- Invoices ---
-  static Future<List<CreditCardInvoice>> getInvoices() async {
-    if (!isAvailable) return [];
-    try {
-      final rows = await _database!.query('invoices');
-      return rows.map((r) => CreditCardInvoice.fromMap(r)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static Future<void> saveInvoice(CreditCardInvoice invoice) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.insert(
-        'invoices',
-        invoice.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (_) {}
-  }
-
-  // --- Categories ---
-  static Future<List<CategoryModel>> getCategories() async {
-    if (!isAvailable) return [];
-    try {
-      final rows = await _database!.query('categories');
-      return rows.map((r) => CategoryModel.fromMap(r)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static Future<void> saveCategory(CategoryModel cat) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.insert(
-        'categories',
-        cat.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (_) {}
-  }
-
-  static Future<void> deleteCategory(String id) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.delete('categories', where: 'id = ?', whereArgs: [id]);
-    } catch (_) {}
-  }
-
-  // --- Transactions ---
-  static Future<List<TransactionModel>> getTransactions() async {
-    if (!isAvailable) return [];
-    try {
-      final rows = await _database!.query(
-        'transactions',
-        orderBy: 'date_iso DESC',
-      );
-      return rows.map((r) => TransactionModel.fromMap(r)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static Future<void> saveTransaction(TransactionModel tx) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.insert(
-        'transactions',
-        tx.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (_) {}
-  }
-
-  static Future<void> saveTransactionsBatch(List<TransactionModel> txs) async {
-    if (!isAvailable || txs.isEmpty) return;
-    try {
-      final batch = _database!.batch();
-      for (final tx in txs) {
-        batch.insert(
-          'transactions',
-          tx.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-      await batch.commit(noResult: true);
-    } catch (_) {}
-  }
-
-  static Future<void> deleteTransaction(String id) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.delete('transactions', where: 'id = ?', whereArgs: [id]);
-    } catch (_) {}
-  }
-
-  static Future<void> deleteInstallmentGroup(String groupId) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.delete(
-        'transactions',
-        where: 'installment_group_id = ?',
-        whereArgs: [groupId],
-      );
-    } catch (_) {}
-  }
-
-  // --- Budgets ---
-  static Future<List<BudgetModel>> getBudgets() async {
-    if (!isAvailable) return [];
-    try {
-      final rows = await _database!.query('budgets');
-      return rows.map((r) => BudgetModel.fromMap(r)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static Future<void> saveBudget(BudgetModel budget) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.insert(
-        'budgets',
-        budget.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (_) {}
-  }
-
-  static Future<void> deleteBudget(String id) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.delete('budgets', where: 'id = ?', whereArgs: [id]);
-    } catch (_) {}
-  }
-
-  // --- Goals ---
-  static Future<List<GoalModel>> getGoals() async {
-    if (!isAvailable) return [];
-    try {
-      final rows = await _database!.query('goals');
-      return rows.map((r) => GoalModel.fromMap(r)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static Future<void> saveGoal(GoalModel goal) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.insert(
-        'goals',
-        goal.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    } catch (_) {}
-  }
-
-  static Future<void> saveGoalsBatch(List<GoalModel> goals) async {
-    if (!isAvailable || goals.isEmpty) return;
-    try {
-      final batch = _database!.batch();
-      for (final goal in goals) {
-        batch.insert(
-          'goals',
-          goal.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-      await batch.commit(noResult: true);
-    } catch (_) {}
-  }
-
-  static Future<void> deleteGoal(String id) async {
-    if (!isAvailable) return;
-    try {
-      await _database!.delete('goals', where: 'id = ?', whereArgs: [id]);
-    } catch (_) {}
-  }
-
-  // --- AI Insights ---
-  static Future<String?> getAiInsight(String yearMonth) async {
-    if (inMemoryAiInsights.containsKey(yearMonth)) {
-      return inMemoryAiInsights[yearMonth];
-    }
-    if (!isAvailable) return null;
-    try {
-      final rows = await _database!.query(
-        'ai_insights',
-        where: 'year_month = ?',
-        whereArgs: [yearMonth],
-        limit: 1,
-      );
-      if (rows.isEmpty) return null;
-      return rows.first['content_md'] as String?;
-    } catch (_) {
+      _inMemoryMode = true;
+      await _ensureFallbackInitialized();
       return null;
     }
   }
 
-  static Future<void> saveAiInsight({
-    required String yearMonth,
-    required String contentMd,
-    required String model,
-  }) async {
-    inMemoryAiInsights[yearMonth] = contentMd;
-    if (!isAvailable) return;
+  Future<void> _ensureFallbackInitialized() async {
+    if (_fallbackLoaded) return;
+    _fallbackLoaded = true;
+
+    if (_isTestMode) {
+      if (_memCategories.isEmpty) {
+        _memCategories.addAll(CategoryItem.defaultCategories());
+      }
+      if (_memCards.isEmpty) {
+        _memCards.addAll(CreditCardItem.defaultCards());
+      }
+      return;
+    }
+
     try {
-      await _database!.insert(
-        'ai_insights',
-        {
-          'id': 'insight_$yearMonth',
-          'year_month': yearMonth,
-          'content_md': contentMd,
-          'model': model,
-          'created_at_iso': DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+      final prefs = await SharedPreferences.getInstance();
+      final catsJson = prefs.getString(_prefFallbackCats);
+      final cardsJson = prefs.getString(_prefFallbackCards);
+      final txsJson = prefs.getString(_prefFallbackTxs);
+
+      if (catsJson != null) {
+        final list = jsonDecode(catsJson) as List<dynamic>;
+        _memCategories
+          ..clear()
+          ..addAll(
+            list.map(
+              (e) => CategoryItem.fromMap(Map<String, dynamic>.from(e as Map)),
+            ),
+          );
+      } else {
+        _memCategories
+          ..clear()
+          ..addAll(CategoryItem.defaultCategories());
+      }
+
+      if (cardsJson != null) {
+        final list = jsonDecode(cardsJson) as List<dynamic>;
+        _memCards
+          ..clear()
+          ..addAll(
+            list.map(
+              (e) =>
+                  CreditCardItem.fromMap(Map<String, dynamic>.from(e as Map)),
+            ),
+          );
+      } else {
+        _memCards
+          ..clear()
+          ..addAll(CreditCardItem.defaultCards());
+      }
+
+      if (txsJson != null) {
+        final list = jsonDecode(txsJson) as List<dynamic>;
+        _memTransactions
+          ..clear()
+          ..addAll(
+            list.map(
+              (e) =>
+                  TransactionItem.fromMap(Map<String, dynamic>.from(e as Map)),
+            ),
+          );
+      }
+      await _saveFallbackToPrefs();
+    } catch (_) {
+      if (_memCategories.isEmpty) {
+        _memCategories.addAll(CategoryItem.defaultCategories());
+      }
+      if (_memCards.isEmpty) {
+        _memCards.addAll(CreditCardItem.defaultCards());
+      }
+    }
+  }
+
+  Future<void> _saveFallbackToPrefs() async {
+    if (_isTestMode) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _prefFallbackCats,
+        jsonEncode(_memCategories.map((c) => c.toMap()).toList()),
+      );
+      await prefs.setString(
+        _prefFallbackCards,
+        jsonEncode(_memCards.map((c) => c.toMap()).toList()),
+      );
+      await prefs.setString(
+        _prefFallbackTxs,
+        jsonEncode(_memTransactions.map((t) => t.toMap()).toList()),
       );
     } catch (_) {}
   }
 
-  static Future<void> clearAllData() async {
-    inMemoryAiInsights.clear();
-    if (!isAvailable) return;
-    try {
-      await _database!.delete('transactions');
-      await _database!.delete('invoices');
-      await _database!.delete('budgets');
-      await _database!.delete('goals');
-      await _database!.delete('credit_cards');
-      await _database!.delete('accounts');
-      await _database!.delete('categories');
-      await _database!.delete('ai_insights');
-    } catch (_) {}
+  Future<void> _createSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        iconKey TEXT NOT NULL,
+        colorValue INTEGER NOT NULL,
+        type TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE credit_cards (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        colorValue INTEGER NOT NULL,
+        closingDay INTEGER NOT NULL,
+        dueDay INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE transactions (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        amount REAL NOT NULL,
+        date TEXT NOT NULL,
+        competenceMonth TEXT NOT NULL,
+        type TEXT NOT NULL,
+        paymentMethod TEXT NOT NULL,
+        categoryId TEXT NOT NULL,
+        cardId TEXT,
+        groupId TEXT,
+        installmentIndex INTEGER NOT NULL DEFAULT 1,
+        installmentTotal INTEGER NOT NULL DEFAULT 1,
+        isRecurring INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute(
+      'CREATE INDEX idx_tx_month ON transactions(competenceMonth)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_tx_group ON transactions(groupId)',
+    );
+  }
+
+  Future<void> _seedDefaults(Database db) async {
+    final batch = db.batch();
+    for (final cat in CategoryItem.defaultCategories()) {
+      batch.insert(
+        'categories',
+        cat.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    for (final card in CreditCardItem.defaultCards()) {
+      batch.insert(
+        'credit_cards',
+        card.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<CategoryItem>> loadCategories() async {
+    final db = await database;
+    if (db == null) {
+      return List<CategoryItem>.from(_memCategories);
+    }
+    final rows = await db.query('categories');
+    if (rows.isEmpty) {
+      await _seedDefaults(db);
+      final seeded = await db.query('categories');
+      return seeded.map(CategoryItem.fromMap).toList();
+    }
+    return rows.map(CategoryItem.fromMap).toList();
+  }
+
+  Future<List<CreditCardItem>> loadCards() async {
+    final db = await database;
+    if (db == null) {
+      return List<CreditCardItem>.from(_memCards);
+    }
+    final rows = await db.query('credit_cards');
+    return rows.map(CreditCardItem.fromMap).toList();
+  }
+
+  Future<List<TransactionItem>> loadTransactions() async {
+    final db = await database;
+    if (db == null) {
+      return List<TransactionItem>.from(_memTransactions);
+    }
+    final rows = await db.query('transactions', orderBy: 'date DESC');
+    return rows.map(TransactionItem.fromMap).toList();
+  }
+
+  Future<void> upsertCategory(CategoryItem category) async {
+    final db = await database;
+    if (db == null) {
+      final idx = _memCategories.indexWhere((c) => c.id == category.id);
+      if (idx >= 0) {
+        _memCategories[idx] = category;
+      } else {
+        _memCategories.add(category);
+      }
+      await _saveFallbackToPrefs();
+      return;
+    }
+    await db.insert(
+      'categories',
+      category.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteCategory(String id) async {
+    final db = await database;
+    if (db == null) {
+      _memCategories.removeWhere((c) => c.id == id);
+      await _saveFallbackToPrefs();
+      return;
+    }
+    await db.delete('categories', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> upsertCard(CreditCardItem card) async {
+    final db = await database;
+    if (db == null) {
+      final idx = _memCards.indexWhere((c) => c.id == card.id);
+      if (idx >= 0) {
+        _memCards[idx] = card;
+      } else {
+        _memCards.add(card);
+      }
+      await _saveFallbackToPrefs();
+      return;
+    }
+    await db.insert(
+      'credit_cards',
+      card.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteCard(String id) async {
+    final db = await database;
+    if (db == null) {
+      _memCards.removeWhere((c) => c.id == id);
+      _memTransactions.removeWhere((t) => t.cardId == id);
+      await _saveFallbackToPrefs();
+      return;
+    }
+    await db.transaction((txn) async {
+      await txn.delete('transactions', where: 'cardId = ?', whereArgs: [id]);
+      await txn.delete('credit_cards', where: 'id = ?', whereArgs: [id]);
+    });
+  }
+
+  Future<void> upsertTransactionsBatch(List<TransactionItem> items) async {
+    if (items.isEmpty) return;
+    final db = await database;
+    if (db == null) {
+      for (final item in items) {
+        final idx = _memTransactions.indexWhere((t) => t.id == item.id);
+        if (idx >= 0) {
+          _memTransactions[idx] = item;
+        } else {
+          _memTransactions.add(item);
+        }
+      }
+      await _saveFallbackToPrefs();
+      return;
+    }
+    final batch = db.batch();
+    for (final item in items) {
+      batch.insert(
+        'transactions',
+        item.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> deleteTransactionIds(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final db = await database;
+    if (db == null) {
+      final set = ids.toSet();
+      _memTransactions.removeWhere((t) => set.contains(t.id));
+      await _saveFallbackToPrefs();
+      return;
+    }
+    final batch = db.batch();
+    for (final id in ids) {
+      batch.delete('transactions', where: 'id = ?', whereArgs: [id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> replaceAllData({
+    required List<CategoryItem> categories,
+    required List<CreditCardItem> cards,
+    required List<TransactionItem> transactions,
+  }) async {
+    final db = await database;
+    if (db == null) {
+      _memCategories
+        ..clear()
+        ..addAll(categories);
+      _memCards
+        ..clear()
+        ..addAll(cards);
+      _memTransactions
+        ..clear()
+        ..addAll(transactions);
+      await _saveFallbackToPrefs();
+      return;
+    }
+    await db.transaction((txn) async {
+      await txn.delete('transactions');
+      await txn.delete('credit_cards');
+      await txn.delete('categories');
+      final batch = txn.batch();
+      for (final c in categories) {
+        batch.insert('categories', c.toMap());
+      }
+      for (final card in cards) {
+        batch.insert('credit_cards', card.toMap());
+      }
+      for (final tx in transactions) {
+        batch.insert('transactions', tx.toMap());
+      }
+      await batch.commit(noResult: true);
+    });
   }
 }
