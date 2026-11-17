@@ -62,6 +62,7 @@ class CategoryItem {
   final String iconKey;
   final int colorValue;
   final TransactionType type;
+  final double monthlyBudget;
 
   const CategoryItem({
     required this.id,
@@ -69,10 +70,13 @@ class CategoryItem {
     required this.iconKey,
     required this.colorValue,
     required this.type,
+    this.monthlyBudget = 0.0,
   });
 
   Color get color => Color(colorValue);
   IconData get icon => AppIconsCatalog.fromKey(iconKey);
+  bool get hasBudget =>
+      type == TransactionType.expense && monthlyBudget > 0.005;
 
   CategoryItem copyWith({
     String? id,
@@ -80,6 +84,7 @@ class CategoryItem {
     String? iconKey,
     int? colorValue,
     TransactionType? type,
+    double? monthlyBudget,
   }) {
     return CategoryItem(
       id: id ?? this.id,
@@ -87,6 +92,7 @@ class CategoryItem {
       iconKey: iconKey ?? this.iconKey,
       colorValue: colorValue ?? this.colorValue,
       type: type ?? this.type,
+      monthlyBudget: monthlyBudget ?? this.monthlyBudget,
     );
   }
 
@@ -96,6 +102,7 @@ class CategoryItem {
         'iconKey': iconKey,
         'colorValue': colorValue,
         'type': type.name,
+        'monthlyBudget': monthlyBudget,
       };
 
   factory CategoryItem.fromMap(Map<String, dynamic> map) {
@@ -105,6 +112,7 @@ class CategoryItem {
       iconKey: (map['iconKey'] as String?) ?? 'category',
       colorValue: (map['colorValue'] as num?)?.toInt() ?? 0xFF059669,
       type: TransactionType.fromString(map['type'] as String?),
+      monthlyBudget: (map['monthlyBudget'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -277,6 +285,7 @@ class TransactionItem {
   final int installmentIndex;
   final int installmentTotal;
   final bool isRecurring;
+  final bool isIgnored;
 
   const TransactionItem({
     required this.id,
@@ -292,6 +301,7 @@ class TransactionItem {
     this.installmentIndex = 1,
     this.installmentTotal = 1,
     this.isRecurring = false,
+    this.isIgnored = false,
   });
 
   bool get isInstallment => installmentTotal > 1;
@@ -314,6 +324,7 @@ class TransactionItem {
     int? installmentIndex,
     int? installmentTotal,
     bool? isRecurring,
+    bool? isIgnored,
   }) {
     return TransactionItem(
       id: id ?? this.id,
@@ -329,6 +340,7 @@ class TransactionItem {
       installmentIndex: installmentIndex ?? this.installmentIndex,
       installmentTotal: installmentTotal ?? this.installmentTotal,
       isRecurring: isRecurring ?? this.isRecurring,
+      isIgnored: isIgnored ?? this.isIgnored,
     );
   }
 
@@ -346,6 +358,7 @@ class TransactionItem {
         'installmentIndex': installmentIndex,
         'installmentTotal': installmentTotal,
         'isRecurring': isRecurring ? 1 : 0,
+        'isIgnored': isIgnored ? 1 : 0,
       };
 
   factory TransactionItem.fromMap(Map<String, dynamic> map) {
@@ -367,6 +380,7 @@ class TransactionItem {
       installmentIndex: (map['installmentIndex'] as num?)?.toInt() ?? 1,
       installmentTotal: (map['installmentTotal'] as num?)?.toInt() ?? 1,
       isRecurring: (map['isRecurring'] == 1 || map['isRecurring'] == true),
+      isIgnored: (map['isIgnored'] == 1 || map['isIgnored'] == true),
     );
   }
 }
@@ -374,7 +388,7 @@ class TransactionItem {
 class CategoryExpenseSummary {
   final CategoryItem category;
   final double amount;
-  final double percentage;
+  final double percentage; // Fatia sobre o total de saídas do mês
   final int count;
 
   const CategoryExpenseSummary({
@@ -383,4 +397,14 @@ class CategoryExpenseSummary {
     required this.percentage,
     required this.count,
   });
+
+  bool get hasBudget => category.hasBudget;
+  double get budget => category.monthlyBudget;
+  double get budgetRatio =>
+      hasBudget ? (amount / budget).clamp(0.0, 1.0) : percentage;
+  double get rawBudgetPercent => hasBudget ? (amount / budget) * 100.0 : 0.0;
+  double get remainingBudget => hasBudget ? (budget - amount) : 0.0;
+  bool get isOverBudget => hasBudget && amount > budget + 0.005;
+  bool get isWarningBudget =>
+      hasBudget && !isOverBudget && (amount / budget) >= 0.80;
 }

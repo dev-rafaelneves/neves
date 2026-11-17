@@ -668,6 +668,12 @@ class _UnifiedImportScreenState extends State<UnifiedImportScreen> {
                                   !c.projectFutureInstallments;
                             });
                           },
+                          onToggleIgnored: () {
+                            HapticFeedback.selectionClick();
+                            setState(() {
+                              c.isIgnored = !c.isIgnored;
+                            });
+                          },
                           onPickCategory: () => _pickCategoryForCandidate(c),
                         ),
                       );
@@ -885,6 +891,7 @@ class _CandidateCard extends StatelessWidget {
   final VoidCallback onToggleSign;
   final VoidCallback onToggleDestination;
   final VoidCallback onToggleProjectFuture;
+  final VoidCallback onToggleIgnored;
   final VoidCallback onPickCategory;
 
   const _CandidateCard({
@@ -895,6 +902,7 @@ class _CandidateCard extends StatelessWidget {
     required this.onToggleSign,
     required this.onToggleDestination,
     required this.onToggleProjectFuture,
+    required this.onToggleIgnored,
     required this.onPickCategory,
   });
 
@@ -1099,6 +1107,55 @@ class _CandidateCard extends StatelessWidget {
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Botão toggle ativo/inativo 'Ignorar'
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: onToggleIgnored,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: candidate.isIgnored
+                              ? AppColors.orange
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: candidate.isIgnored
+                                ? AppColors.orange
+                                : AppColors.border(context),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              candidate.isIgnored
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_off_outlined,
+                              size: 12,
+                              color: candidate.isIgnored
+                                  ? Colors.white
+                                  : AppColors.textSecondary(context),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Ignorar',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: candidate.isIgnored
+                                    ? Colors.white
+                                    : AppColors.textSecondary(context),
                               ),
                             ),
                           ],

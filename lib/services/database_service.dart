@@ -46,10 +46,26 @@ class DatabaseService {
       final fullPath = p.join(dbPath, 'neves_mvp_v2.db');
       _db = await openDatabase(
         fullPath,
-        version: 1,
+        version: 3,
         onCreate: (db, version) async {
           await _createSchema(db);
           await _seedDefaults(db);
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) {
+            try {
+              await db.execute(
+                'ALTER TABLE transactions ADD COLUMN isIgnored INTEGER NOT NULL DEFAULT 0',
+              );
+            } catch (_) {}
+          }
+          if (oldVersion < 3) {
+            try {
+              await db.execute(
+                'ALTER TABLE categories ADD COLUMN monthlyBudget REAL NOT NULL DEFAULT 0',
+              );
+            } catch (_) {}
+          }
         },
       );
       return _db;
@@ -159,7 +175,8 @@ class DatabaseService {
         name TEXT NOT NULL,
         iconKey TEXT NOT NULL,
         colorValue INTEGER NOT NULL,
-        type TEXT NOT NULL
+        type TEXT NOT NULL,
+        monthlyBudget REAL NOT NULL DEFAULT 0
       )
     ''');
 
@@ -187,7 +204,8 @@ class DatabaseService {
         groupId TEXT,
         installmentIndex INTEGER NOT NULL DEFAULT 1,
         installmentTotal INTEGER NOT NULL DEFAULT 1,
-        isRecurring INTEGER NOT NULL DEFAULT 0
+        isRecurring INTEGER NOT NULL DEFAULT 0,
+        isIgnored INTEGER NOT NULL DEFAULT 0
       )
     ''');
 

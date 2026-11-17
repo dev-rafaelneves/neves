@@ -382,6 +382,11 @@ class CardsSettingsTab extends StatelessWidget {
     CategoryItem? existing,
   }) async {
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final budgetCtrl = TextEditingController(
+      text: (existing != null && existing.hasBudget)
+          ? CentavosCurrencyFormatter.formatDouble(existing.monthlyBudget)
+          : '',
+    );
     TransactionType type = existing?.type ?? TransactionType.expense;
     String iconKey = existing?.iconKey ?? 'category';
     int colorVal =
@@ -463,6 +468,23 @@ class CardsSettingsTab extends StatelessWidget {
                           border: OutlineInputBorder(),
                         ),
                       ),
+                      if (type == TransactionType.expense) ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: budgetCtrl,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            const CentavosCurrencyFormatter(),
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'Teto Mensal Opcional (R\$)',
+                            hintText: '0,00 (sem limite)',
+                            prefixText: 'R\$ ',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       const Text(
                         'Ícone',
@@ -553,12 +575,18 @@ class CardsSettingsTab extends StatelessWidget {
                           onPressed: () async {
                             final name = nameCtrl.text.trim();
                             if (name.isEmpty) return;
+                            final budgetVal = type == TransactionType.expense
+                                ? CentavosCurrencyFormatter.parseValue(
+                                    budgetCtrl.text,
+                                  )
+                                : 0.0;
                             await appState.saveCategory(
                               id: existing?.id,
                               name: name,
                               iconKey: iconKey,
                               colorValue: colorVal,
                               type: type,
+                              monthlyBudget: budgetVal,
                             );
                             if (ctx.mounted) Navigator.of(ctx).pop();
                           },
@@ -607,7 +635,9 @@ class _CategoryEditChip extends StatelessWidget {
             Icon(cat.icon, size: 15, color: cat.color),
             const SizedBox(width: 5),
             Text(
-              cat.name,
+              cat.hasBudget
+                  ? '${cat.name} • ${AppFormatters.currency(cat.monthlyBudget)}'
+                  : cat.name,
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,

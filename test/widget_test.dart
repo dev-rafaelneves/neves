@@ -86,6 +86,132 @@ void main() {
   });
 
   test(
+      'Botão Ignorar: exclui de despesas/receitas/categorias mas mantém no total da fatura do cartão',
+      () async {
+    final state = AppState();
+    await state.initialize();
+    final cardId = state.cards.first.id;
+    state.setSelectedYearMonth('2026-11');
+
+    // Receita própria R$ 4.000
+    await state.createTransaction(
+      title: 'Salário',
+      totalAmount: 4000.00,
+      date: DateTime(2026, 11, 5),
+      type: TransactionType.income,
+      paymentMethod: PaymentMethod.cash,
+      categoryId: 'cat_salary',
+      firstCompetenceMonth: '2026-11',
+    );
+
+    // Compra própria no cartão R$ 1.200
+    await state.createTransaction(
+      title: 'Mercado Mês',
+      totalAmount: 1200.00,
+      date: DateTime(2026, 11, 10),
+      type: TransactionType.expense,
+      paymentMethod: PaymentMethod.creditCard,
+      categoryId: 'cat_food',
+      cardId: cardId,
+      firstCompetenceMonth: '2026-11',
+    );
+
+    // Compra de terceiro no cartão R$ 300 em 2x (R$ 150 por mês)
+    await state.createTransaction(
+      title: 'Celular Terceiro',
+      totalAmount: 300.00,
+      date: DateTime(2026, 11, 12),
+      type: TransactionType.expense,
+      paymentMethod: PaymentMethod.creditCard,
+      categoryId: 'cat_shopping',
+      cardId: cardId,
+      firstCompetenceMonth: '2026-11',
+      installments: 2,
+    );
+
+    // Antes de ativar o Ignorar: fatura = 1350, despesas próprias = 1350
+    expect(state.cardInvoiceTotal(cardId, '2026-11'), 1350.00);
+    expect(state.monthTotalExpense('2026-11'), 1350.00);
+    expect(state.expensesByCategory('2026-11').length, 2);
+
+    // Ativa o Ignorar em todas as parcelas de 'Celular Terceiro'
+    final thirdPartyTx = state
+        .transactionsForMonth('2026-11')
+        .firstWhere((t) => t.title == 'Celular Terceiro');
+    await state.toggleIgnoreTransaction(thirdPartyTx, applyToGroup: true);
+
+    // Fatura do banco continua R$ 1.350 (1.200 próprios + 150 ignorados)
+    expect(state.cardInvoiceTotal(cardId, '2026-11'), 1350.00);
+    expect(state.cardOwnExpenseTotal(cardId, '2026-11'), 1200.00);
+    expect(state.cardIgnoredExpenseTotal(cardId, '2026-11'), 150.00);
+
+    // Mas no Resumo do Mês (Total de Saídas, Quanto Sobra e Categorias), conta só os R$ 1.200!
+    expect(state.monthTotalExpense('2026-11'), 1200.00);
+    expect(state.monthBalance('2026-11'), 2800.00);
+    expect(state.expensesByCategory('2026-11').length, 1);
+    expect(state.expensesByCategory('2026-11').single.category.id, 'cat_food');
+
+    // E a 2ª parcela em Dezembro/2026 também ficou ignorada automaticamente
+    expect(state.cardInvoiceTotal(cardId, '2026-12'), 150.00);
+    expect(state.monthTotalExpense('2026-12'), 0.00);
+  });
+
+  test(
+      'Teto Mensal por Categoria: aparece com R\$ 0 gastos e alerta em 80% e 100%',
+      () async {
+    final state = AppState();
+    await state.initialize();
+    state.setSelectedYearMonth('2026-11');
+
+    // Define teto de R$ 500,00 para Lazer (cat_leisure)
+    await state.updateCategoryBudget('cat_leisure', 500.00);
+    expect(state.totalPlannedCategoryBudget(), 500.00);
+
+    // Mesmo com R$ 0 gastos em Novembro, cat_leisure aparece em expensesByCategory
+    var summaryList = state.expensesByCategory('2026-11');
+    expect(summaryList.length, 1);
+    expect(summaryList.single.category.id, 'cat_leisure');
+    expect(summaryList.single.amount, 0.0);
+    expect(summaryList.single.remainingBudget, 500.00);
+    expect(summaryList.single.isWarningBudget, isFalse);
+    expect(summaryList.single.isOverBudget, isFalse);
+
+    // Lança R$ 420,00 em Lazer (84% do teto -> Atenção >= 80%)
+    await state.createTransaction(
+      title: 'Restaurante Fim de Semana',
+      totalAmount: 420.00,
+      date: DateTime(2026, 11, 14),
+      type: TransactionType.expense,
+      paymentMethod: PaymentMethod.cash,
+      categoryId: 'cat_leisure',
+      firstCompetenceMonth: '2026-11',
+    );
+
+    summaryList = state.expensesByCategory('2026-11');
+    expect(summaryList.single.amount, 420.00);
+    expect(summaryList.single.remainingBudget, 80.00);
+    expect(summaryList.single.isWarningBudget, isTrue);
+    expect(summaryList.single.isOverBudget, isFalse);
+
+    // Lança mais R$ 130,00 em Lazer (Total R$ 550,00 -> Acima do teto de R$ 500)
+    await state.createTransaction(
+      title: 'Cinema e Passeio',
+      totalAmount: 130.00,
+      date: DateTime(2026, 11, 20),
+      type: TransactionType.expense,
+      paymentMethod: PaymentMethod.cash,
+      categoryId: 'cat_leisure',
+      firstCompetenceMonth: '2026-11',
+    );
+
+    summaryList = state.expensesByCategory('2026-11');
+    expect(summaryList.single.amount, 550.00);
+    expect(summaryList.single.remainingBudget, -50.00);
+    expect(summaryList.single.isOverBudget, isTrue);
+    expect(state.totalSpentInBudgetedCategories('2026-11'), 550.00);
+  });
+
+  test(
       'Importador Unificado: Fatura com parcelas futuras, estorno e filtro de pagamento/cofrinho',
       () async {
     final state = AppState();

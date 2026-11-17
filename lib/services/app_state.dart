@@ -147,34 +147,52 @@ class AppState extends ChangeNotifier {
     return _transactions.where((t) => t.competenceMonth == target).toList();
   }
 
-  /// Total de Receitas do mês
+  /// Total de Receitas do mês (exclui itens com Ignorar ativo)
   double monthIncome([String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
     for (final t in _transactions) {
-      if (t.competenceMonth == target && t.type == TransactionType.income) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.income &&
+          !t.isIgnored) {
         sum += t.amount;
       }
     }
     return sum;
   }
 
-  /// Total de Gastos à Vista (Pix / Débito) no mês
+  /// Total de Gastos à Vista (Pix / Débito) no mês (exclui itens com Ignorar ativo)
   double monthCashExpense([String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
     for (final t in _transactions) {
       if (t.competenceMonth == target &&
           t.type == TransactionType.expense &&
-          t.paymentMethod == PaymentMethod.cash) {
+          t.paymentMethod == PaymentMethod.cash &&
+          !t.isIgnored) {
         sum += t.amount;
       }
     }
     return sum;
   }
 
-  /// Total das Faturas de Cartão de Crédito no mês
+  /// Total de Gastos Próprios em Faturas de Cartão no mês (exclui itens com Ignorar ativo)
   double monthCardExpense([String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    double sum = 0.0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.expense &&
+          t.paymentMethod == PaymentMethod.creditCard &&
+          !t.isIgnored) {
+        sum += t.amount;
+      }
+    }
+    return sum;
+  }
+
+  /// Total da Fatura do Banco de todos os cartões no mês (inclui próprios + ignorados)
+  double monthAllCardsBankInvoiceTotal([String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
     for (final t in _transactions) {
@@ -187,17 +205,17 @@ class AppState extends ChangeNotifier {
     return sum;
   }
 
-  /// Total de Saídas do mês (Gastos à Vista + Faturas do Mês)
+  /// Total de Saídas Próprias do mês (Gastos à Vista + Gastos Próprios em Faturas)
   double monthTotalExpense([String? ym]) {
     return monthCashExpense(ym) + monthCardExpense(ym);
   }
 
-  /// Quanto Sobra no Mês (Receitas - Total de Saídas)
+  /// Quanto Sobra no Mês (Receitas - Total de Saídas Próprias)
   double monthBalance([String? ym]) {
     return monthIncome(ym) - monthTotalExpense(ym);
   }
 
-  /// Total da fatura de um cartão específico no mês
+  /// Total da fatura do banco de um cartão específico no mês (soma próprios + ignorados para bater com o banco)
   double cardInvoiceTotal(String cardId, [String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
@@ -206,6 +224,38 @@ class AppState extends ChangeNotifier {
           t.type == TransactionType.expense &&
           t.paymentMethod == PaymentMethod.creditCard &&
           t.cardId == cardId) {
+        sum += t.amount;
+      }
+    }
+    return sum;
+  }
+
+  /// Total apenas dos SEUS gastos (não ignorados) na fatura de um cartão no mês
+  double cardOwnExpenseTotal(String cardId, [String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    double sum = 0.0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.expense &&
+          t.paymentMethod == PaymentMethod.creditCard &&
+          t.cardId == cardId &&
+          !t.isIgnored) {
+        sum += t.amount;
+      }
+    }
+    return sum;
+  }
+
+  /// Total das compras com Ignorar ativo na fatura de um cartão no mês
+  double cardIgnoredExpenseTotal(String cardId, [String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    double sum = 0.0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.expense &&
+          t.paymentMethod == PaymentMethod.creditCard &&
+          t.cardId == cardId &&
+          t.isIgnored) {
         sum += t.amount;
       }
     }
@@ -227,42 +277,101 @@ class AppState extends ChangeNotifier {
     return count;
   }
 
-  /// Resumo de despesas por categoria no mês (À Vista + Cartão)
+  /// Soma de todos os tetos mensais configurados nas categorias de despesa
+  double totalPlannedCategoryBudget() {
+    double sum = 0.0;
+    for (final c in _categories) {
+      if (c.hasBudget) sum += c.monthlyBudget;
+    }
+    return sum;
+  }
+
+  /// Soma do que foi gasto no mês nas categorias que possuem teto definido
+  double totalSpentInBudgetedCategories([String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    final budgetedIds =
+        _categories.where((c) => c.hasBudget).map((c) => c.id).toSet();
+    if (budgetedIds.isEmpty) return 0.0;
+    double sum = 0.0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.expense &&
+          !t.isIgnored &&
+          budgetedIds.contains(t.categoryId)) {
+        sum += t.amount;
+      }
+    }
+    return sum;
+  }
+
+  /// Lançamentos de uma categoria específica no mês (exclui ignorados)
+  List<TransactionItem> transactionsForCategoryInMonth(
+    String categoryId, [
+    String? ym,
+  ]) {
+    final target = ym ?? _selectedYearMonth;
+    return _transactions
+        .where(
+          (t) =>
+              t.competenceMonth == target &&
+              t.categoryId == categoryId &&
+              !t.isIgnored,
+        )
+        .toList();
+  }
+
+  /// Resumo de despesas por categoria no mês (inclui categorias com teto mesmo com R$ 0 gastos, e exclui itens com Ignorar ativo)
   List<CategoryExpenseSummary> expensesByCategory([String? ym]) {
     final target = ym ?? _selectedYearMonth;
-    final totalExp = monthTotalExpense(target);
-    if (totalExp <= 0) return const [];
 
     final Map<String, double> sums = {};
     final Map<String, int> counts = {};
 
     for (final t in _transactions) {
-      if (t.competenceMonth == target && t.type == TransactionType.expense) {
+      if (t.competenceMonth == target &&
+          t.type == TransactionType.expense &&
+          !t.isIgnored) {
         sums[t.categoryId] = (sums[t.categoryId] ?? 0.0) + t.amount;
         counts[t.categoryId] = (counts[t.categoryId] ?? 0) + 1;
       }
     }
 
-    final result = <CategoryExpenseSummary>[];
     double positiveCatTotal = 0.0;
     sums.forEach((_, amount) {
       if (amount > 0) positiveCatTotal += amount;
     });
-    if (positiveCatTotal <= 0) return const [];
 
-    sums.forEach((catId, amount) {
-      if (amount <= 0.005) return;
+    final Set<String> candidateCatIds = {
+      ...sums.keys,
+      ..._categories.where((c) => c.hasBudget).map((c) => c.id),
+    };
+
+    final result = <CategoryExpenseSummary>[];
+    for (final catId in candidateCatIds) {
+      final cat = categoryById(catId);
+      final rawAmount = sums[catId] ?? 0.0;
+      final amount = rawAmount < 0 ? 0.0 : rawAmount;
+      if (amount <= 0.005 && !cat.hasBudget) continue;
+
+      final pct = positiveCatTotal > 0
+          ? (amount / positiveCatTotal).clamp(0.0, 1.0)
+          : 0.0;
+
       result.add(
         CategoryExpenseSummary(
-          category: categoryById(catId),
+          category: cat,
           amount: amount,
-          percentage: (amount / positiveCatTotal).clamp(0.0, 1.0),
-          count: counts[catId] ?? 1,
+          percentage: pct,
+          count: counts[catId] ?? 0,
         ),
       );
-    });
+    }
 
-    result.sort((a, b) => b.amount.compareTo(a.amount));
+    result.sort((a, b) {
+      final cmp = b.amount.compareTo(a.amount);
+      if (cmp != 0) return cmp;
+      return b.category.monthlyBudget.compareTo(a.category.monthlyBudget);
+    });
     return result;
   }
 
@@ -292,6 +401,7 @@ class AppState extends ChangeNotifier {
     required String firstCompetenceMonth,
     int installments = 1,
     bool isRecurring = false,
+    bool isIgnored = false,
   }) async {
     final cleanTitle = title.trim();
     final effectivePayment =
@@ -322,6 +432,7 @@ class AppState extends ChangeNotifier {
             installmentIndex: i + 1,
             installmentTotal: installments,
             isRecurring: false,
+            isIgnored: isIgnored,
           ),
         );
       }
@@ -350,6 +461,7 @@ class AppState extends ChangeNotifier {
             installmentIndex: 1,
             installmentTotal: 1,
             isRecurring: true,
+            isIgnored: isIgnored,
           ),
         );
       }
@@ -370,6 +482,7 @@ class AppState extends ChangeNotifier {
           installmentIndex: 1,
           installmentTotal: 1,
           isRecurring: false,
+          isIgnored: isIgnored,
         ),
       );
     }
@@ -377,6 +490,34 @@ class AppState extends ChangeNotifier {
     await DatabaseService.instance.upsertTransactionsBatch(toSave);
     _transactions.addAll(toSave);
     _sortTransactions();
+    notifyListeners();
+  }
+
+  /// Alterna diretamente o estado ativo/inativo do botão Ignorar em um lançamento (ou em todo o grupo de parcelas).
+  Future<void> toggleIgnoreTransaction(
+    TransactionItem item, {
+    bool applyToGroup = false,
+  }) async {
+    final newIgnored = !item.isIgnored;
+    final List<TransactionItem> toSave = [
+      item.copyWith(isIgnored: newIgnored),
+    ];
+
+    if (applyToGroup && item.groupId != null) {
+      for (final tx in _transactions) {
+        if (tx.groupId == item.groupId && tx.id != item.id) {
+          toSave.add(tx.copyWith(isIgnored: newIgnored));
+        }
+      }
+    }
+
+    await DatabaseService.instance.upsertTransactionsBatch(toSave);
+    for (final updated in toSave) {
+      final idx = _transactions.indexWhere((t) => t.id == updated.id);
+      if (idx >= 0) {
+        _transactions[idx] = updated;
+      }
+    }
     notifyListeners();
   }
 
@@ -399,6 +540,7 @@ class AppState extends ChangeNotifier {
               categoryId: updated.categoryId,
               cardId: updated.cardId,
               paymentMethod: updated.paymentMethod,
+              isIgnored: updated.isIgnored,
             ),
           );
         }
@@ -466,6 +608,7 @@ class AppState extends ChangeNotifier {
             installmentIndex: 1,
             installmentTotal: 1,
             isRecurring: false,
+            isIgnored: c.isIgnored,
           ),
         );
       } else {
@@ -495,6 +638,7 @@ class AppState extends ChangeNotifier {
             installmentIndex: hasMultiInstallments ? c.installmentIndex : 1,
             installmentTotal: hasMultiInstallments ? c.installmentTotal : 1,
             isRecurring: false,
+            isIgnored: c.isIgnored,
           ),
         );
 
@@ -537,6 +681,7 @@ class AppState extends ChangeNotifier {
                   installmentIndex: nextIdx,
                   installmentTotal: c.installmentTotal,
                   isRecurring: false,
+                  isIgnored: c.isIgnored,
                 ),
               );
             }
@@ -596,13 +741,20 @@ class AppState extends ChangeNotifier {
     required String iconKey,
     required int colorValue,
     required TransactionType type,
+    double? monthlyBudget,
   }) async {
+    final existing = id != null ? categoryById(id) : null;
+    final effectiveBudget = type == TransactionType.expense
+        ? (monthlyBudget ?? existing?.monthlyBudget ?? 0.0)
+        : 0.0;
+
     final category = CategoryItem(
       id: id ?? _uuid.v4(),
       name: name.trim(),
       iconKey: iconKey,
       colorValue: colorValue,
       type: type,
+      monthlyBudget: effectiveBudget < 0 ? 0.0 : effectiveBudget,
     );
     await DatabaseService.instance.upsertCategory(category);
     final idx = _categories.indexWhere((c) => c.id == category.id);
@@ -611,6 +763,20 @@ class AppState extends ChangeNotifier {
     } else {
       _categories.add(category);
     }
+    notifyListeners();
+  }
+
+  Future<void> updateCategoryBudget(
+    String categoryId,
+    double monthlyBudget,
+  ) async {
+    final idx = _categories.indexWhere((c) => c.id == categoryId);
+    if (idx < 0) return;
+    final updated = _categories[idx].copyWith(
+      monthlyBudget: monthlyBudget < 0 ? 0.0 : monthlyBudget,
+    );
+    await DatabaseService.instance.upsertCategory(updated);
+    _categories[idx] = updated;
     notifyListeners();
   }
 

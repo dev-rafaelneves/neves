@@ -39,6 +39,8 @@ class _TransactionsTabState extends State<TransactionsTab> {
         }
       } else if (filter == 'income') {
         if (tx.type != TransactionType.income) return false;
+      } else if (filter == 'ignored') {
+        if (!tx.isIgnored) return false;
       } else if (filter != null && filter.startsWith('card:')) {
         final cardId = filter.substring(5);
         if (tx.type != TransactionType.expense ||
@@ -218,6 +220,17 @@ class _TransactionsTabState extends State<TransactionsTab> {
                         },
                       ),
                     ],
+                    const SizedBox(width: 6),
+                    _FilterPill(
+                      label: 'Ignorados',
+                      icon: Icons.visibility_off_outlined,
+                      selected: activeFilter == 'ignored',
+                      color: AppColors.orange,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        appState.setExtratoFilter('ignored');
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -265,6 +278,20 @@ class _TransactionsTabState extends State<TransactionsTab> {
                             color: AppColors.textSecondary(context),
                           ),
                         ),
+                        if (appState
+                                .cardIgnoredExpenseTotal(selectedCard.id, ym)
+                                .abs() >
+                            0.005) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            'Seus gastos: ${AppFormatters.currency(appState.cardOwnExpenseTotal(selectedCard.id, ym), discreet: discreet)} • Ignorados: ${AppFormatters.currency(appState.cardIgnoredExpenseTotal(selectedCard.id, ym), discreet: discreet)}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary(context),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -399,6 +426,73 @@ class _TransactionsTabState extends State<TransactionsTab> {
                           appState: appState,
                           existing: tx,
                         ),
+                        onToggleIgnore: () async {
+                          HapticFeedback.selectionClick();
+                          if (tx.groupId != null) {
+                            final scope = await showModalBottomSheet<String>(
+                              context: context,
+                              backgroundColor: Colors.transparent,
+                              builder: (ctx) => Container(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface(ctx),
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(24),
+                                  ),
+                                ),
+                                child: SafeArea(
+                                  top: false,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        tx.isIgnored
+                                            ? 'Desativar Ignorar'
+                                            : 'Ativar Ignorar',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton(
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop('single'),
+                                          child: const Text(
+                                            'Apenas neste mês',
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: FilledButton(
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop('group'),
+                                          child: Text(
+                                            tx.isInstallment
+                                                ? 'Em todas as parcelas (${tx.installmentTotal}x)'
+                                                : 'Em todos os meses deste lançamento',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                            if (scope == null) return;
+                            await appState.toggleIgnoreTransaction(
+                              tx,
+                              applyToGroup: scope == 'group',
+                            );
+                          } else {
+                            await appState.toggleIgnoreTransaction(tx);
+                          }
+                        },
                       ),
                     );
                   },
@@ -472,6 +566,7 @@ class _TransactionTile extends StatelessWidget {
   final CreditCardItem? card;
   final bool discreet;
   final VoidCallback onTap;
+  final VoidCallback onToggleIgnore;
 
   const _TransactionTile({
     required this.tx,
@@ -479,6 +574,7 @@ class _TransactionTile extends StatelessWidget {
     required this.card,
     required this.discreet,
     required this.onTap,
+    required this.onToggleIgnore,
   });
 
   @override
@@ -486,9 +582,11 @@ class _TransactionTile extends StatelessWidget {
     final isIncome = tx.type == TransactionType.income;
     final isCardRefund = tx.type == TransactionType.expense && tx.amount < 0;
     final isPositiveVisual = isIncome || isCardRefund;
-    final amountColor = isPositiveVisual
-        ? AppColors.success(context)
-        : AppColors.danger(context);
+    final amountColor = tx.isIgnored
+        ? AppColors.textSecondary(context)
+        : (isPositiveVisual
+            ? AppColors.success(context)
+            : AppColors.danger(context));
 
     final String paymentBadge = isIncome
         ? 'Receita'
@@ -501,7 +599,9 @@ class _TransactionTile extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
-          color: AppColors.border(context),
+          color: tx.isIgnored
+              ? AppColors.orange.withValues(alpha: 0.45)
+              : AppColors.border(context),
           width: 0.8,
         ),
       ),
@@ -516,12 +616,15 @@ class _TransactionTile extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: category.color.withValues(alpha: 0.14),
+                  color: category.color
+                      .withValues(alpha: tx.isIgnored ? 0.08 : 0.14),
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: Icon(
                   category.icon,
-                  color: category.color,
+                  color: tx.isIgnored
+                      ? AppColors.textSecondary(context)
+                      : category.color,
                   size: 20,
                 ),
               ),
@@ -540,7 +643,9 @@ class _TransactionTile extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14.5,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary(context),
+                              color: tx.isIgnored
+                                  ? AppColors.textSecondary(context)
+                                  : AppColors.textPrimary(context),
                             ),
                           ),
                         ),
@@ -580,13 +685,68 @@ class _TransactionTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                '${isPositiveVisual ? '+' : '-'} ${AppFormatters.currency(tx.amount.abs(), discreet: discreet)}',
-                style: TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w800,
-                  color: amountColor,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${isPositiveVisual ? '+' : '-'} ${AppFormatters.currency(tx.amount.abs(), discreet: discreet)}',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      color: amountColor,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  // Botão toggle ativo/inativo 'Ignorar'
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: onToggleIgnore,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: tx.isIgnored
+                            ? AppColors.orange
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: tx.isIgnored
+                              ? AppColors.orange
+                              : AppColors.border(context),
+                          width: 0.9,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            tx.isIgnored
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_off_outlined,
+                            size: 11.5,
+                            color: tx.isIgnored
+                                ? Colors.white
+                                : AppColors.textSecondary(context),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Ignorar',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: tx.isIgnored
+                                  ? Colors.white
+                                  : AppColors.textSecondary(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

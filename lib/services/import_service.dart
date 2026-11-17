@@ -29,6 +29,7 @@ class ImportCandidate {
 
   bool selected;
   bool isDuplicate;
+  bool isIgnored;
   String? ignoreReason;
 
   ImportCandidate({
@@ -45,6 +46,7 @@ class ImportCandidate {
     this.projectFutureInstallments = false,
     this.selected = true,
     this.isDuplicate = false,
+    this.isIgnored = false,
     this.ignoreReason,
   });
 

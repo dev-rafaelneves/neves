@@ -60,6 +60,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
 
   int _installments = 1;
   bool _isRecurring = false;
+  bool _isIgnored = false;
   bool _applyToFuture = false;
   String? _errorText;
 
@@ -83,8 +84,9 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
       _userPickedCategory = true;
       _installments = ex.installmentTotal;
       _isRecurring = ex.isRecurring;
+      _isIgnored = ex.isIgnored;
       _amountCtrl = TextEditingController(
-        text: CentavosCurrencyFormatter.formatDouble(ex.amount),
+        text: CentavosCurrencyFormatter.formatDouble(ex.amount.abs()),
       );
       _titleCtrl = TextEditingController(text: ex.title);
     } else {
@@ -289,7 +291,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
 
       final updated = ex.copyWith(
         title: finalTitle,
-        amount: amount,
+        amount: ex.amount < 0 ? -amount : amount,
         date: _selectedDate,
         competenceMonth: effectiveCompetence,
         type: _type,
@@ -298,6 +300,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
         cardId: effectivePayment == PaymentMethod.creditCard
             ? _selectedCardId
             : null,
+        isIgnored: _isIgnored,
       );
       await widget.appState.updateTransaction(
         updated,
@@ -322,6 +325,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
         installments:
             effectivePayment == PaymentMethod.creditCard ? _installments : 1,
         isRecurring: _installments == 1 && _isRecurring,
+        isIgnored: _isIgnored,
       );
     }
 
@@ -993,6 +997,86 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                         ),
                       ),
                     ],
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _isIgnored
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_off_outlined,
+                            size: 20,
+                            color: _isIgnored
+                                ? AppColors.orange
+                                : AppColors.textSecondary(context),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Ignorar do meu resumo',
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  isCreditCard
+                                      ? 'Continua na fatura do cartão, mas não entra nas suas despesas/categorias'
+                                      : 'Não soma nas suas despesas, receitas ou gráficos',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: AppColors.textSecondary(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() => _isIgnored = !_isIgnored);
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 140),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _isIgnored
+                                    ? AppColors.orange
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _isIgnored
+                                      ? AppColors.orange
+                                      : AppColors.border(context),
+                                ),
+                              ),
+                              child: Text(
+                                'Ignorar',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: _isIgnored
+                                      ? Colors.white
+                                      : AppColors.textSecondary(context),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     if (_isEditing && widget.existing!.groupId != null) ...[
                       const Divider(height: 1),
                       Padding(
