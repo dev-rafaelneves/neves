@@ -320,6 +320,20 @@ class AppState extends ChangeNotifier {
         .toList();
   }
 
+  /// Soma do valor de uma categoria específica no mês (exclui ignorados)
+  double categoryMonthlyAmount(String categoryId, [String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    double sum = 0.0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.categoryId == categoryId &&
+          !t.isIgnored) {
+        sum += t.amount;
+      }
+    }
+    return sum < 0 ? 0.0 : sum;
+  }
+
   /// Resumo de despesas por categoria no mês (inclui categorias com teto mesmo com R$ 0 gastos, e exclui itens com Ignorar ativo)
   List<CategoryExpenseSummary> expensesByCategory([String? ym]) {
     final target = ym ?? _selectedYearMonth;

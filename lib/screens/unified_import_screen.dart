@@ -6,7 +6,6 @@ import '../models/models.dart';
 import '../services/app_state.dart';
 import '../services/import_service.dart';
 import '../theme/app_theme.dart';
-import 'tabs/cards_settings_tab.dart';
 
 class UnifiedImportScreen extends StatefulWidget {
   final AppState appState;
@@ -430,125 +429,203 @@ class _UnifiedImportScreenState extends State<UnifiedImportScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _DestinationChip(
-                        label: 'Conta Corrente / Pix',
-                        icon: Icons.bolt_rounded,
-                        color: AppColors.blue,
-                        selected:
-                            _destination == ImportDestinationType.checking,
-                        onTap: () => _updateGlobalDestination(
-                          ImportDestinationType.checking,
+
+                // Lista (Dropdown) Principal: Conta Corrente vs Fatura de Cartão
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.isDark(context)
+                        ? AppColors.darkBackground
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.border(context),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<ImportDestinationType>(
+                      value: _destination,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(12),
+                      items: const [
+                        DropdownMenuItem(
+                          value: ImportDestinationType.checking,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.account_balance_rounded,
+                                size: 18,
+                                color: AppColors.blue,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Conta Corrente',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      for (final card in cards) ...[
-                        const SizedBox(width: 8),
-                        _DestinationChip(
-                          label: 'Fatura: ${card.name}',
-                          icon: Icons.credit_card_rounded,
-                          color: card.color,
-                          selected:
-                              _destination == ImportDestinationType.creditCard &&
-                                  _selectedCardId == card.id,
-                          onTap: () => _updateGlobalDestination(
-                            ImportDestinationType.creditCard,
-                            cardId: card.id,
+                        DropdownMenuItem(
+                          value: ImportDestinationType.creditCard,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.credit_card_rounded,
+                                size: 18,
+                                color: AppColors.purple,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Fatura de Cartão',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                      if (_destination == ImportDestinationType.creditCard &&
-                          _selectedCardId != null) ...[
-                        const SizedBox(width: 6),
-                        ActionChip(
-                          avatar: const Icon(Icons.edit_outlined, size: 15),
-                          label: const Text(
-                            'Editar Cartão',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          onPressed: () async {
-                            final card =
-                                widget.appState.cardById(_selectedCardId);
-                            await CardsSettingsTab.showCardModal(
-                              context,
-                              widget.appState,
-                              existing: card,
-                            );
-                            if (mounted) setState(() {});
-                          },
-                        ),
-                      ],
-                    ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          _updateGlobalDestination(
+                            val,
+                            cardId: _selectedCardId ??
+                                (cards.isNotEmpty ? cards.first.id : null),
+                          );
+                        }
+                      },
+                    ),
                   ),
                 ),
 
-                // Seletor do Mês da Fatura quando Fatura de Cartão estiver ativa
+                // Seleção do Cartão e do Mês da Fatura quando Fatura estiver ativa
                 if (_destination == ImportDestinationType.creditCard) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.purple.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.calendar_month_rounded,
-                          size: 18,
-                          color: AppColors.purple,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Mês desta Fatura (todas as compras entram nela):',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary(context),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.isDark(context)
+                                ? AppColors.darkBackground
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.border(context),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: cards.any((c) => c.id == _selectedCardId)
+                                  ? _selectedCardId
+                                  : (cards.isNotEmpty ? cards.first.id : null),
+                              isExpanded: true,
+                              hint: const Text('Selecione o Cartão'),
+                              borderRadius: BorderRadius.circular(12),
+                              items: cards
+                                  .map(
+                                    (card) => DropdownMenuItem<String>(
+                                      value: card.id,
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.credit_card_rounded,
+                                            size: 16,
+                                            color: card.color,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              card.name,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (cardId) {
+                                if (cardId != null) {
+                                  _updateGlobalDestination(
+                                    ImportDestinationType.creditCard,
+                                    cardId: cardId,
+                                  );
+                                }
+                              },
                             ),
                           ),
                         ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 28,
-                            minHeight: 28,
-                          ),
-                          onPressed: () => _changeInvoiceMonth(-1),
-                          icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 6,
                         ),
-                        Text(
-                          AppFormatters.monthLabel(
-                            _selectedInvoiceMonth,
-                            short: true,
-                          ),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.purple,
-                          ),
+                        decoration: BoxDecoration(
+                          color: AppColors.purple.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 28,
-                            minHeight: 28,
-                          ),
-                          onPressed: () => _changeInvoiceMonth(1),
-                          icon:
-                              const Icon(Icons.chevron_right_rounded, size: 20),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 28,
+                                minHeight: 28,
+                              ),
+                              onPressed: () => _changeInvoiceMonth(-1),
+                              icon: const Icon(
+                                Icons.chevron_left_rounded,
+                                size: 20,
+                              ),
+                            ),
+                            Text(
+                              AppFormatters.monthLabel(
+                                _selectedInvoiceMonth,
+                                short: true,
+                              ),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.purple,
+                              ),
+                            ),
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 28,
+                                minHeight: 28,
+                              ),
+                              onPressed: () => _changeInvoiceMonth(1),
+                              icon: const Icon(
+                                Icons.chevron_right_rounded,
+                                size: 20,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
 
@@ -829,60 +906,6 @@ class _UnifiedImportScreenState extends State<UnifiedImportScreen> {
   }
 }
 
-class _DestinationChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _DestinationChip({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? color : color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? color : color.withValues(alpha: 0.35),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: selected ? Colors.white : color,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: selected ? Colors.white : AppColors.textPrimary(context),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _CandidateCard extends StatelessWidget {
   final ImportCandidate candidate;
   final AppState appState;
@@ -920,7 +943,7 @@ class _CandidateCard extends StatelessWidget {
     final String signPrefix = isPositiveDisplay ? '+' : '-';
     final String typeLabel = isCard
         ? (candidate.isCreditOrRefund ? 'Estorno na Fatura' : 'Compra Cartão')
-        : (candidate.isCreditOrRefund ? 'Receita (+)' : 'Saída à Vista');
+        : (candidate.isCreditOrRefund ? 'Receita (+)' : 'Saída Conta');
 
     return Opacity(
       opacity: candidate.selected ? 1.0 : 0.58,
@@ -1094,7 +1117,7 @@ class _CandidateCard extends StatelessWidget {
                             Icon(
                               isCard
                                   ? Icons.credit_card_rounded
-                                  : Icons.bolt_rounded,
+                                  : Icons.account_balance_rounded,
                               size: 13,
                               color: isCard
                                   ? (card?.color ?? AppColors.purple)
@@ -1102,7 +1125,9 @@ class _CandidateCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              isCard ? (card?.name ?? 'Cartão') : 'À Vista',
+                              isCard
+                                  ? (card?.name ?? 'Cartão')
+                                  : 'Conta Corrente',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w700,

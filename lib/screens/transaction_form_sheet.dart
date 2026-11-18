@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/models.dart';
 import '../services/app_state.dart';
 import '../theme/app_theme.dart';
-import 'tabs/cards_settings_tab.dart';
+import 'tabs/cards_tab.dart';
 
 class TransactionFormSheet extends StatefulWidget {
   final AppState appState;
@@ -599,7 +599,7 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                       onPressed: () async {
                         final currentCard =
                             widget.appState.cardById(_selectedCardId);
-                        await CardsSettingsTab.showCardModal(
+                        await CardsTab.showCardModal(
                           context,
                           widget.appState,
                           existing: _paymentMethod == PaymentMethod.creditCard
@@ -639,8 +639,8 @@ class _TransactionFormSheetState extends State<TransactionFormSheet> {
                     runSpacing: 8,
                     children: [
                       _PaymentChoiceChip(
-                        label: 'À Vista (Pix / Débito)',
-                        icon: Icons.bolt_rounded,
+                        label: 'Conta Corrente',
+                        icon: Icons.account_balance_rounded,
                         color: AppColors.primary,
                         selected: _paymentMethod == PaymentMethod.cash,
                         onTap: () {

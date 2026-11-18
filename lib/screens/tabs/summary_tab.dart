@@ -5,7 +5,6 @@ import '../../services/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../transaction_form_sheet.dart';
 import '../unified_import_screen.dart';
-import 'cards_settings_tab.dart';
 
 class SummaryTab extends StatelessWidget {
   final AppState appState;
@@ -136,17 +135,17 @@ class SummaryTab extends StatelessWidget {
               ),
               const SizedBox(height: 10),
 
-              // Linha 2: Composição das Saídas (À Vista vs Faturas do Mês)
+              // Linha 2: Composição das Saídas (Conta Corrente vs Faturas do Mês)
               Row(
                 children: [
                   Expanded(
                     child: _MetricTile(
-                      label: 'Saídas à Vista (Pix)',
+                      label: 'Conta Corrente',
                       value: AppFormatters.currency(
                         cashExpense,
                         discreet: discreet,
                       ),
-                      icon: Icons.bolt_rounded,
+                      icon: Icons.account_balance_rounded,
                       color: AppColors.blue,
                       onTap: () {
                         HapticFeedback.selectionClick();
@@ -297,17 +296,6 @@ class SummaryTab extends StatelessWidget {
                     HapticFeedback.selectionClick();
                     appState.setActiveTab(1, filter: 'card:${cards[i].id}');
                   },
-                  onQuickAdd: () => TransactionFormSheet.show(
-                    context,
-                    appState: appState,
-                    initialType: TransactionType.expense,
-                    initialCardId: cards[i].id,
-                  ),
-                  onEditCard: () => CardsSettingsTab.showCardModal(
-                    context,
-                    appState,
-                    existing: cards[i],
-                  ),
                 ),
               ],
             ],
@@ -584,8 +572,6 @@ class _CardInvoiceRow extends StatelessWidget {
   final int itemCount;
   final bool discreet;
   final VoidCallback onTap;
-  final VoidCallback onQuickAdd;
-  final VoidCallback onEditCard;
 
   const _CardInvoiceRow({
     required this.card,
@@ -595,8 +581,6 @@ class _CardInvoiceRow extends StatelessWidget {
     required this.itemCount,
     required this.discreet,
     required this.onTap,
-    required this.onQuickAdd,
-    required this.onEditCard,
   });
 
   @override
@@ -606,102 +590,93 @@ class _CardInvoiceRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        child: Row(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: card.color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.credit_card_rounded,
-                color: card.color,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+            // Linha 1: Ícone + Nome do Cartão à esquerda | Valor Total à direita
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: card.color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.credit_card_rounded,
+                    color: card.color,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
                     card.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary(context),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Fecha dia ${card.closingDay} • Vence dia ${card.dueDay} • $itemCount ${itemCount == 1 ? 'item' : 'itens'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary(context),
-                    ),
-                  ),
-                  if (hasIgnored) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)} • Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary(context),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
+                ),
+                const SizedBox(width: 10),
                 Text(
                   AppFormatters.currency(invoiceTotal, discreet: discreet),
                   style: TextStyle(
-                    fontSize: 15.5,
+                    fontSize: 16.5,
                     fontWeight: FontWeight.w800,
                     color: invoiceTotal > 0
                         ? AppColors.danger(context)
                         : AppColors.textSecondary(context),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Ver fatura →',
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // Linha 2: Vencimento + Quantidade de compras à esquerda | Ver fatura à direita
+            Padding(
+              padding: const EdgeInsets.only(left: 44),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Vence dia ${card.dueDay} • $itemCount ${itemCount == 1 ? 'compra' : 'compras'}',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.textSecondary(context),
+                    ),
+                  ),
+                  Text(
+                    'Ver fatura →',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: card.color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            if (hasIgnored) ...[
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(left: 44),
+                child: Text(
+                  'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)} • Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    color: card.color,
+                    color: AppColors.textSecondary(context),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              tooltip: 'Editar cartão',
-              visualDensity: VisualDensity.compact,
-              onPressed: onEditCard,
-              icon: Icon(
-                Icons.edit_outlined,
-                color: AppColors.textSecondary(context),
-                size: 20,
               ),
-            ),
-            IconButton(
-              tooltip: 'Lançar neste cartão',
-              visualDensity: VisualDensity.compact,
-              onPressed: onQuickAdd,
-              icon: Icon(
-                Icons.add_circle_outline_rounded,
-                color: card.color,
-                size: 22,
-              ),
-            ),
+            ],
           ],
         ),
       ),
@@ -1121,7 +1096,7 @@ class _CategoryBudgetAndDetailsSheetState
                       ),
                     ),
                     subtitle: Text(
-                      '${AppFormatters.shortDate(tx.date)} • ${tx.paymentMethod == PaymentMethod.creditCard ? (widget.appState.cardById(tx.cardId)?.name ?? 'Cartão') : 'À Vista'}',
+                      '${AppFormatters.shortDate(tx.date)} • ${tx.paymentMethod == PaymentMethod.creditCard ? (widget.appState.cardById(tx.cardId)?.name ?? 'Cartão') : 'Conta Corrente'}',
                       style: TextStyle(
                         fontSize: 11.5,
                         color: AppColors.textSecondary(context),

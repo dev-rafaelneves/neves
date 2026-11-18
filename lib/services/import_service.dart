@@ -2,7 +2,7 @@ import '../models/models.dart';
 import '../theme/app_theme.dart';
 
 enum ImportDestinationType {
-  checking('Conta Corrente / Pix (À Vista)'),
+  checking('Conta Corrente'),
   creditCard('Fatura de Cartão');
 
   final String label;
@@ -233,6 +233,7 @@ class ImportService {
         lower.contains('pagto fatura') ||
         lower.contains('pagamento fatura') ||
         lower.contains('pagamento recebido') ||
+        lower.contains('pagamento antecipado') ||
         lower.contains('pgto fatura') ||
         lower.contains('deb aut fatura') ||
         lower.contains('debito automatico fatura') ||
@@ -717,34 +718,45 @@ class ImportService {
       if (cols.length < 2) continue;
 
       DateTime? foundDate;
-      double? foundSignedAmount;
-      final textParts = <String>[];
-
-      for (final col in cols) {
-        final c = col.trim();
+      int dateColIdx = -1;
+      for (int cIdx = 0; cIdx < cols.length; cIdx++) {
+        final c = cols[cIdx].trim();
         if (c.isEmpty) continue;
-
-        if (foundDate == null) {
-          final dt = _tryParseDateToken(c, fallbackYear: fallbackYear);
-          if (dt != null) {
-            foundDate = dt;
-            continue;
-          }
+        final dt = _tryParseDateToken(c, fallbackYear: fallbackYear);
+        if (dt != null) {
+          foundDate = dt;
+          dateColIdx = cIdx;
+          break;
         }
+      }
+      if (foundDate == null) continue;
 
-        // Verifica se a coluna é puramente um valor monetário
+      double? foundSignedAmount;
+      int amountColIdx = -1;
+      // Procura a coluna de valor da direita para a esquerda para não confundir nomes numéricos (ex: "99") com o valor
+      for (int cIdx = cols.length - 1; cIdx >= 0; cIdx--) {
+        if (cIdx == dateColIdx) continue;
+        final c = cols[cIdx].trim();
+        if (c.isEmpty) continue;
         if (_looksLikePureMoneyColumn(c)) {
           final val = _parseFlexibleNumber(c);
           if (val != null && val.abs() >= 0.01) {
             foundSignedAmount = val;
-            continue;
+            amountColIdx = cIdx;
+            break;
           }
         }
-
-        textParts.add(c);
       }
+      if (foundSignedAmount == null) continue;
 
-      if (foundDate == null || foundSignedAmount == null) continue;
+      final textParts = <String>[];
+      for (int cIdx = 0; cIdx < cols.length; cIdx++) {
+        if (cIdx == dateColIdx || cIdx == amountColIdx) continue;
+        final c = cols[cIdx].trim();
+        if (c.isNotEmpty) {
+          textParts.add(c);
+        }
+      }
       final rawTitle =
           textParts.isNotEmpty ? textParts.join(' - ') : 'Lançamento';
       final cleanTitle = _cleanTitleNoise(rawTitle);
@@ -804,9 +816,9 @@ class ImportService {
       caseSensitive: false,
     );
 
-    // Regex para valor monetário no final da linha: ex: '-R$ 1.234,56', 'R$ 45,90', '-120,00', '45,90 C', '45,90 D'
+    // Regex para valor monetário no final da linha: aceita com centavos (45,90 / 1.234,56) ou inteiro (8 / 77 / 40)
     final moneyEndExp = RegExp(
-      r'([+\-]?\s*(?:R\$\s*)?[+\-]?\s*(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}|\b[+\-]?\d+\.\d{2})\s*([CDcd])?$',
+      r'([+\-]?\s*(?:R\$\s*)?[+\-]?\s*(?:(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{1,2})?|\d+(?:\.\d{1,2})?))\s*([CDcd])?$',
     );
 
     DateTime? pendingDate;
@@ -945,7 +957,7 @@ class ImportService {
         .replaceAll(' ', '')
         .replaceAll('+', '')
         .replaceAll('-', '');
-    return RegExp(r'^(?:\d{1,3}(?:[.,]\d{3})*|\d+)[.,]\d{2}$')
+    return RegExp(r'^(?:\d{1,3}(?:[.,]\d{3})*|\d+)(?:[.,]\d{1,2})?$')
         .hasMatch(cleaned);
   }
 

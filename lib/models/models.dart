@@ -17,7 +17,7 @@ enum TransactionType {
 }
 
 enum PaymentMethod {
-  cash('À Vista (Pix / Débito)'),
+  cash('Conta Corrente'),
   creditCard('Cartão de Crédito');
 
   final String label;
@@ -184,7 +184,7 @@ class CategoryItem {
         ),
         CategoryItem(
           id: 'cat_extra',
-          name: 'Renda Extra / Pix',
+          name: 'Renda Extra',
           iconKey: 'Attach_money',
           colorValue: 0xFF10B981,
           type: TransactionType.income,

@@ -307,7 +307,66 @@ void main() {
     expect(state.monthBalance('2026-11'), closeTo(3774.50, 0.001));
   });
 
-  testWidgets('Renderiza as 3 abas do MVP e o botão de Importar',
+  test('Importador Unificado: importa todas as 33 linhas inclusive valores inteiros sem ,00',
+      () async {
+    final state = AppState();
+    await state.initialize();
+    final cardId = state.cards.first.id;
+
+    const rawCsv = '''
+date;title;amount
+17/11/2026;SUPER UNIAO SUPERMERCAD;40,36
+17/11/2026;LorenaRodrigues;8
+16/11/2026;Mercado Livre;59,86
+16/11/2026;POSTO BASE;161,49
+16/11/2026;AGROPECUARIA CERRADO;77
+15/11/2026;IsleneNeves;32
+15/11/2026;CONCEBRA;2,70
+15/11/2026;CONCEBRA;2,70
+15/11/2026;SUPER UNIAO SUPERMERCAD;15,98
+14/11/2026;INFPAY 65270722 LUZILENE;214,73
+14/11/2026;POSTO ALCOOLBRAS F9;40
+14/11/2026;GLEIDE ALICE NEVES M;21,90
+14/11/2026;Q DELICIA;33,98
+12/11/2026;SUPER BOM SUCESSO;35,97
+11/11/2026;SUPER UNIAO SUPERMERCAD;9,58
+09/11/2026;Mercado Livre;680,07
+09/11/2026;POSTO BASE;81,70
+09/11/2026;Pagamento antecipado;-680,41
+07/11/2026;AUTO POSTO GOIANAO;50
+06/11/2026;COSTA ATACADAO;341,46
+06/11/2026;VANESSA BIJU SC COMERC;113,91
+06/11/2026;FABRICCA DI SORVETE;35
+03/11/2026;MauricioAlvesDe;9
+02/11/2026;BarRodoviario;13
+31/10/2026;SUPERMERCADO ALVORADA;11,46
+30/10/2026;ACAITERIA TRILHAS AMAZ;31,51
+30/10/2026;CHURRASCARIA E RESTAURANT;44
+30/10/2026;ATACADAO RIO DAS PEDRA;9,96
+29/10/2026;SUPER BOM SUCESSO;38,53
+29/10/2026;ICONNECT ELETRONICOS E;20
+29/10/2026;CYTRUS RESTAURANTE;41,96
+29/10/2026;POSTO BASE;180,80
+10/08/2026;Mercado Livre — parcela 4/4;50,30
+''';
+
+    final candidates = ImportService.parseContent(
+      content: rawCsv,
+      defaultDestination: ImportDestinationType.creditCard,
+      selectedInvoiceMonth: '2026-11',
+      defaultCardId: cardId,
+      categories: state.categories,
+      existingTransactions: state.allTransactions,
+    );
+
+    expect(candidates.length, 33);
+    expect(candidates[1].title, 'LorenaRodrigues');
+    expect(candidates[1].amount, 8.0);
+    expect(candidates[4].title, 'AGROPECUARIA CERRADO');
+    expect(candidates[4].amount, 77.0);
+  });
+
+  testWidgets('Renderiza as 5 abas do MVP e o cabeçalho em 2 linhas',
       (WidgetTester tester) async {
     final state = AppState();
     await state.initialize();
@@ -315,8 +374,10 @@ void main() {
     await tester.pumpWidget(NevesMvpApp(appState: state));
     await tester.pumpAndSettle();
 
-    // Aba 1: Resumo
+    // Cabeçalho em 2 linhas + Aba 1: Resumo
+    expect(find.text('Neves Finanças'), findsOneWidget);
     expect(find.text('QUANTO SOBRA NO MÊS'), findsOneWidget);
+    expect(find.text('Conta Corrente'), findsOneWidget);
     expect(find.text('Gasto'), findsOneWidget);
     expect(find.text('Receita'), findsOneWidget);
     expect(find.text('Importar'), findsOneWidget);
@@ -324,13 +385,12 @@ void main() {
     // Navega para Aba 2: Extrato
     await tester.tap(find.text('Extrato'));
     await tester.pumpAndSettle();
-    expect(find.text('À Vista (Pix)'), findsOneWidget);
+    expect(find.text('Conta Corrente'), findsOneWidget);
 
-    // Navega para Aba 3: Cartões & Ajustes
-    await tester.tap(find.text('Cartões & Ajustes'));
+    // Navega para Aba 3: Cartões
+    await tester.tap(find.text('Cartões'));
     await tester.pumpAndSettle();
     expect(find.text('Novo Cartão'), findsOneWidget);
-    expect(find.text('Nova Categoria'), findsOneWidget);
 
     // Edita o Cartão Principal para 'Nubank Ultravioleta'
     await tester.tap(find.text('Editar'));
@@ -344,10 +404,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Nubank Ultravioleta'), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.text('Exportar Backup (JSON)'),
-      200,
-    );
+    // Navega para Aba 4: Categorias
+    await tester.tap(find.text('Categorias'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nova Categoria'), findsOneWidget);
+
+    // Navega para Aba 5: Ajustes
+    await tester.tap(find.text('Ajustes'));
+    await tester.pumpAndSettle();
     expect(find.text('Exportar Backup (JSON)'), findsOneWidget);
   });
 }

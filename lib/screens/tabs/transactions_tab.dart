@@ -5,7 +5,7 @@ import '../../services/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../transaction_form_sheet.dart';
 import '../unified_import_screen.dart';
-import 'cards_settings_tab.dart';
+import 'cards_tab.dart';
 
 class TransactionsTab extends StatefulWidget {
   final AppState appState;
@@ -187,8 +187,8 @@ class _TransactionsTabState extends State<TransactionsTab> {
                     ),
                     const SizedBox(width: 6),
                     _FilterPill(
-                      label: 'À Vista (Pix)',
-                      icon: Icons.bolt_rounded,
+                      label: 'Conta Corrente',
+                      icon: Icons.account_balance_rounded,
                       selected: activeFilter == 'cash',
                       color: AppColors.blue,
                       onTap: () {
@@ -322,7 +322,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
                   IconButton(
                     tooltip: 'Editar Cartão',
                     visualDensity: VisualDensity.compact,
-                    onPressed: () => CardsSettingsTab.showCardModal(
+                    onPressed: () => CardsTab.showCardModal(
                       context,
                       appState,
                       existing: selectedCard,
@@ -592,7 +592,7 @@ class _TransactionTile extends StatelessWidget {
         ? 'Receita'
         : (tx.paymentMethod == PaymentMethod.creditCard
             ? (card?.name ?? 'Cartão')
-            : 'À Vista');
+            : 'Conta Corrente');
 
     return Material(
       color: AppColors.surface(context),
