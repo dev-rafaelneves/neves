@@ -282,14 +282,24 @@ class _TransactionsTabState extends State<TransactionsTab> {
                                 .cardIgnoredExpenseTotal(selectedCard.id, ym)
                                 .abs() >
                             0.005) ...[
-                          const SizedBox(height: 3),
-                          Text(
-                            'Seus gastos: ${AppFormatters.currency(appState.cardOwnExpenseTotal(selectedCard.id, ym), discreet: discreet)} • Ignorados: ${AppFormatters.currency(appState.cardIgnoredExpenseTotal(selectedCard.id, ym), discreet: discreet)}',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary(context),
-                            ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              HigInfoPill(
+                                icon: Icons.person_outline_rounded,
+                                text:
+                                    'Seus gastos: ${AppFormatters.currency(appState.cardOwnExpenseTotal(selectedCard.id, ym), discreet: discreet)}',
+                                color: AppColors.primary,
+                              ),
+                              HigInfoPill(
+                                icon: Icons.visibility_off_outlined,
+                                text:
+                                    'Ignorados: ${AppFormatters.currency(appState.cardIgnoredExpenseTotal(selectedCard.id, ym), discreet: discreet)}',
+                                color: AppColors.orange,
+                              ),
+                            ],
                           ),
                         ],
                       ],
@@ -351,14 +361,19 @@ class _TransactionsTabState extends State<TransactionsTab> {
                     color: AppColors.textSecondary(context),
                   ),
                 ),
-                Text(
-                  'Resultado listado: ${AppFormatters.currency(filteredSum.abs(), discreet: discreet)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: filteredSum >= 0
-                        ? AppColors.success(context)
-                        : AppColors.danger(context),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Resultado: ${AppFormatters.currency(filteredSum.abs(), discreet: discreet)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: filteredSum >= 0
+                          ? AppColors.success(context)
+                          : AppColors.danger(context),
+                    ),
                   ),
                 ),
               ],
@@ -688,61 +703,80 @@ class _TransactionTile extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    '${isPositiveVisual ? '+' : '-'} ${AppFormatters.currency(tx.amount.abs(), discreet: discreet)}',
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      color: amountColor,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 118),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '${isPositiveVisual ? '+' : '-'} ${AppFormatters.currency(tx.amount.abs(), discreet: discreet)}',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: amountColor,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 5),
-                  // Botão toggle ativo/inativo 'Ignorar'
-                  InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: onToggleIgnore,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 140),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: tx.isIgnored
-                            ? AppColors.orange
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: tx.isIgnored
-                              ? AppColors.orange
-                              : AppColors.border(context),
-                          width: 0.9,
+                  // Botão toggle ativo/inativo 'Ignorar' com área de toque segura e Semantics
+                  Semantics(
+                    button: true,
+                    toggled: tx.isIgnored,
+                    label: tx.isIgnored ? 'Ignorar ativo' : 'Ignorar inativo',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: onToggleIgnore,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minHeight: 32,
+                          minWidth: 72,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            tx.isIgnored
-                                ? Icons.visibility_off_rounded
-                                : Icons.visibility_off_outlined,
-                            size: 11.5,
-                            color: tx.isIgnored
-                                ? Colors.white
-                                : AppColors.textSecondary(context),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 140),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Ignorar',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
+                          decoration: BoxDecoration(
+                            color: tx.isIgnored
+                                ? AppColors.orange
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
                               color: tx.isIgnored
-                                  ? Colors.white
-                                  : AppColors.textSecondary(context),
+                                  ? AppColors.orange
+                                  : AppColors.border(context),
+                              width: 0.9,
                             ),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                tx.isIgnored
+                                    ? Icons.visibility_off_rounded
+                                    : Icons.visibility_off_outlined,
+                                size: 12,
+                                color: tx.isIgnored
+                                    ? Colors.white
+                                    : AppColors.textSecondary(context),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Ignorar',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: tx.isIgnored
+                                      ? Colors.white
+                                      : AppColors.textSecondary(context),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),

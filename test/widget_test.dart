@@ -414,4 +414,70 @@ date;title;amount
     await tester.pumpAndSettle();
     expect(find.text('Exportar Backup (JSON)'), findsOneWidget);
   });
+
+  testWidgets(
+      'Stress Test UI 360dp + TextScaler 1.25x: zero RenderFlex overflow nas 5 abas com dados densos',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 740);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final state = AppState();
+    await state.initialize();
+    state.setSelectedYearMonth('2026-11');
+    final cardId = state.cards.first.id;
+
+    await state.updateCategoryBudget('cat_food', 1500.00);
+    await state.createTransaction(
+      title: 'Salário Corporativo Mensal',
+      totalAmount: 125430.89,
+      date: DateTime(2026, 11, 5),
+      type: TransactionType.income,
+      paymentMethod: PaymentMethod.cash,
+      categoryId: 'cat_salary',
+      firstCompetenceMonth: '2026-11',
+    );
+    await state.createTransaction(
+      title: 'Supermercado Atacadão Compra Grande do Mês',
+      totalAmount: 1680.50,
+      date: DateTime(2026, 11, 10),
+      type: TransactionType.expense,
+      paymentMethod: PaymentMethod.creditCard,
+      categoryId: 'cat_food',
+      cardId: cardId,
+      firstCompetenceMonth: '2026-11',
+      installments: 6,
+    );
+    await state.createTransaction(
+      title: 'Compra Terceiro Ignorada na Fatura',
+      totalAmount: 2450.00,
+      date: DateTime(2026, 11, 12),
+      type: TransactionType.expense,
+      paymentMethod: PaymentMethod.creditCard,
+      categoryId: 'cat_shopping',
+      cardId: cardId,
+      firstCompetenceMonth: '2026-11',
+      isIgnored: true,
+    );
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          size: Size(360, 740),
+          textScaler: TextScaler.linear(1.25),
+        ),
+        child: NevesMvpApp(appState: state),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verifica que todas as 5 abas renderizam sem nenhum erro de overflow
+    for (final tabName in ['Extrato', 'Cartões', 'Categorias', 'Ajustes', 'Resumo']) {
+      await tester.tap(find.text(tabName).last);
+      await tester.pumpAndSettle();
+    }
+  });
 }

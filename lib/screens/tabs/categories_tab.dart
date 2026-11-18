@@ -442,14 +442,10 @@ class _CategoryListRow extends StatelessWidget {
             ),
             if (hasBudget) ...[
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(100),
-                child: LinearProgressIndicator(
-                  value: ratio,
-                  minHeight: 5,
-                  backgroundColor: barColor.withValues(alpha: 0.14),
-                  valueColor: AlwaysStoppedAnimation<Color>(barColor),
-                ),
+              HigAnimatedProgressBar(
+                value: ratio,
+                color: barColor,
+                minHeight: 5,
               ),
             ],
           ],

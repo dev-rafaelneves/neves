@@ -210,69 +210,110 @@ class _CreditCardDetailCard extends StatelessWidget {
         const Divider(height: 1),
         const SizedBox(height: 12),
 
-        // Linha 2: Resumo da Fatura do Mês
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // Linha 2: Resumo da Fatura do Mês + Ações em largura total (à prova de 360dp + 1.25x)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Fatura de ${AppFormatters.monthLabel(yearMonth, short: true)} ($itemCount ${itemCount == 1 ? 'compra' : 'compras'})',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary(context),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  AppFormatters.currency(invoiceTotal, discreet: discreet),
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: invoiceTotal > 0
-                        ? AppColors.danger(context)
-                        : AppColors.textPrimary(context),
-                  ),
-                ),
-                if (hasIgnored) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)} • Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
+                Flexible(
+                  child: Text(
+                    'Fatura de ${AppFormatters.monthLabel(yearMonth, short: true)} ($itemCount ${itemCount == 1 ? 'compra' : 'compras'})',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary(context),
                     ),
                   ),
-                ],
+                ),
+                const SizedBox(width: 8),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    AppFormatters.currency(invoiceTotal, discreet: discreet),
+                    style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      color: invoiceTotal > 0
+                          ? AppColors.danger(context)
+                          : AppColors.textPrimary(context),
+                    ),
+                  ),
+                ),
               ],
             ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+            if (hasIgnored) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  HigInfoPill(
+                    icon: Icons.person_outline_rounded,
+                    text:
+                        'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)}',
+                    color: AppColors.primary,
                   ),
-                  onPressed: onImportInvoice,
-                  child: const Text(
-                    'Importar',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  HigInfoPill(
+                    icon: Icons.visibility_off_outlined,
+                    text:
+                        'Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
+                    color: AppColors.orange,
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(40),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: onImportInvoice,
+                    icon: const Icon(Icons.upload_file_rounded, size: 16),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Importar Fatura',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                FilledButton.tonal(
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  onPressed: onViewInvoice,
-                  child: const Text(
-                    'Ver Fatura',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(40),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: onViewInvoice,
+                    icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Ver Fatura',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],

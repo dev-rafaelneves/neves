@@ -49,15 +49,20 @@ class SummaryTab extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'QUANTO SOBRA NO MÊS',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                      color: AppColors.textSecondary(context),
+                  Flexible(
+                    child: Text(
+                      'QUANTO SOBRA NO MÊS',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                        color: AppColors.textSecondary(context),
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -79,18 +84,27 @@ class SummaryTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              Text(
-                AppFormatters.currency(balance, discreet: discreet),
-                style: TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1.0,
-                  color: balanceColor,
+              // Hero Value com FittedBox e AnimatedSwitcher para zero overflow e fluidez
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: Text(
+                    AppFormatters.currency(balance, discreet: discreet),
+                    key: ValueKey<String>('${ym}_${discreet}_$balance'),
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1.0,
+                      color: balanceColor,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                'Entradas menos gastos à vista e faturas de ${AppFormatters.monthLabel(ym, short: true)}',
+                'Entradas menos saídas de ${AppFormatters.monthLabel(ym, short: true)} (exclui itens ignorados)',
                 style: TextStyle(
                   fontSize: 12.5,
                   color: AppColors.textSecondary(context),
@@ -181,14 +195,15 @@ class SummaryTab extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // Ações Rápidas
+        // Ações Rápidas (Ergonomia 48dp + FittedBox contra quebra em 360dp)
         Row(
           children: [
             Expanded(
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.rose,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  minimumSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -199,9 +214,12 @@ class SummaryTab extends StatelessWidget {
                   initialType: TransactionType.expense,
                 ),
                 icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
-                label: const Text(
-                  'Gasto',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Gasto',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ),
@@ -210,7 +228,8 @@ class SummaryTab extends StatelessWidget {
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  minimumSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -221,9 +240,12 @@ class SummaryTab extends StatelessWidget {
                   initialType: TransactionType.income,
                 ),
                 icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                label: const Text(
-                  'Receita',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Receita',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ),
@@ -231,7 +253,8 @@ class SummaryTab extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  minimumSize: const Size.fromHeight(48),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -241,9 +264,12 @@ class SummaryTab extends StatelessWidget {
                   appState: appState,
                 ),
                 icon: const Icon(Icons.upload_file_rounded, size: 18),
-                label: const Text(
-                  'Importar',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                label: const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Importar',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ),
@@ -644,13 +670,18 @@ class _CardInvoiceRow extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Vence dia ${card.dueDay} • $itemCount ${itemCount == 1 ? 'compra' : 'compras'}',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: AppColors.textSecondary(context),
+                  Flexible(
+                    child: Text(
+                      'Vence dia ${card.dueDay} • $itemCount ${itemCount == 1 ? 'compra' : 'compras'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary(context),
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     'Ver fatura →',
                     style: TextStyle(
@@ -664,16 +695,26 @@ class _CardInvoiceRow extends StatelessWidget {
             ),
 
             if (hasIgnored) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.only(left: 44),
-                child: Text(
-                  'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)} • Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary(context),
-                  ),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    HigInfoPill(
+                      icon: Icons.person_outline_rounded,
+                      text:
+                          'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)}',
+                      color: AppColors.primary,
+                    ),
+                    HigInfoPill(
+                      icon: Icons.visibility_off_outlined,
+                      text:
+                          'Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
+                      color: AppColors.orange,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -723,14 +764,19 @@ class _PlannedBudgetBanner extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Total nas Categorias com Teto',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary(context),
+              Flexible(
+                child: Text(
+                  'Total nas Categorias com Teto',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary(context),
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 '${AppFormatters.currency(spentInBudgeted, discreet: discreet)} / ${AppFormatters.currency(totalPlanned, discreet: discreet)}',
                 style: TextStyle(
@@ -742,14 +788,9 @@ class _PlannedBudgetBanner extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(100),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 6,
-              backgroundColor: statusColor.withValues(alpha: 0.14),
-              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-            ),
+          HigAnimatedProgressBar(
+            value: ratio,
+            color: statusColor,
           ),
           const SizedBox(height: 6),
           Align(
@@ -887,14 +928,9 @@ class _CategorySummaryRow extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(100),
-              child: LinearProgressIndicator(
-                value: hasBudget ? item.budgetRatio : item.percentage,
-                minHeight: 6,
-                backgroundColor: barColor.withValues(alpha: 0.13),
-                valueColor: AlwaysStoppedAnimation<Color>(barColor),
-              ),
+            HigAnimatedProgressBar(
+              value: hasBudget ? item.budgetRatio : item.percentage,
+              color: barColor,
             ),
           ],
         ),

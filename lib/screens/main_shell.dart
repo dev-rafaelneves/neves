@@ -21,100 +21,108 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final tabIdx = appState.activeTabIndex;
 
-    final Widget body;
+    final Widget activeTabBody;
     switch (tabIdx) {
       case 1:
-        body = TransactionsTab(appState: appState);
+        activeTabBody = TransactionsTab(
+          key: const ValueKey<int>(1),
+          appState: appState,
+        );
         break;
       case 2:
-        body = CardsTab(appState: appState);
+        activeTabBody = CardsTab(
+          key: const ValueKey<int>(2),
+          appState: appState,
+        );
         break;
       case 3:
-        body = CategoriesTab(appState: appState);
+        activeTabBody = CategoriesTab(
+          key: const ValueKey<int>(3),
+          appState: appState,
+        );
         break;
       case 4:
-        body = SettingsTab(appState: appState);
+        activeTabBody = SettingsTab(
+          key: const ValueKey<int>(4),
+          appState: appState,
+        );
         break;
       case 0:
       default:
-        body = SummaryTab(appState: appState);
+        activeTabBody = SummaryTab(
+          key: const ValueKey<int>(0),
+          appState: appState,
+        );
         break;
     }
 
     return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(98),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.isDark(context)
-                ? AppColors.darkBackground
-                : AppColors.lightBackground,
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 12, 6),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Cabeçalho em 2 linhas elástico (à prova de overflow em qualquer TextScaler)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Linha 1: Ícone + Nome do App
+                  // Linha 1: Ícone + Marca
                   Row(
                     children: [
                       const NevesAppIcon(size: 28),
                       const SizedBox(width: 8),
-                      Text(
-                        'Neves Finanças',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                          color: AppColors.textPrimary(context),
+                      Flexible(
+                        child: Text(
+                          'Neves Finanças',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                            color: AppColors.textPrimary(context),
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
 
-                  // Linha 2: Seletor de Mês à esquerda | Importar + Olhinho à direita
+                  // Linha 2: Seletor de Mês à esquerda | Ações táteis (44x44dp) à direita
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Flexible(
                         child: MonthSelectorBar(appState: appState),
                       ),
+                      const SizedBox(width: 8),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(
+                          _HeaderActionButton(
                             tooltip: 'Importar Extrato / Fatura',
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => UnifiedImportScreen.open(
+                            icon: Icons.upload_file_rounded,
+                            onTap: () => UnifiedImportScreen.open(
                               context,
                               appState: appState,
                             ),
-                            icon: Icon(
-                              Icons.upload_file_rounded,
-                              size: 21,
-                              color: AppColors.textSecondary(context),
-                            ),
                           ),
-                          IconButton(
+                          const SizedBox(width: 8),
+                          _HeaderActionButton(
                             tooltip: appState.discreetMode
                                 ? 'Mostrar valores'
                                 : 'Ocultar valores',
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () {
+                            icon: appState.discreetMode
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            isActive: appState.discreetMode,
+                            onTap: () {
                               HapticFeedback.selectionClick();
                               appState.toggleDiscreetMode();
                             },
-                            icon: Icon(
-                              appState.discreetMode
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              size: 21,
-                              color: AppColors.textSecondary(context),
-                            ),
                           ),
                         ],
                       ),
@@ -123,10 +131,17 @@ class MainShell extends StatelessWidget {
                 ],
               ),
             ),
-          ),
+
+            // Conteúdo da aba ativa com transição suave
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 160),
+                child: activeTabBody,
+              ),
+            ),
+          ],
         ),
       ),
-      body: body,
       floatingActionButton: FloatingActionButton(
         tooltip: 'Novo Lançamento',
         backgroundColor: AppColors.primary,
@@ -209,6 +224,57 @@ class MainShell extends StatelessWidget {
               label: 'Ajustes',
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderActionButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _HeaderActionButton({
+    required this.tooltip,
+    required this.icon,
+    this.isActive = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: isActive
+              ? AppColors.primary.withValues(alpha: 0.14)
+              : AppColors.surface(context),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: isActive ? AppColors.primary : AppColors.border(context),
+              width: 0.8,
+            ),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              child: Icon(
+                icon,
+                size: 20,
+                color: isActive
+                    ? AppColors.primary
+                    : AppColors.textSecondary(context),
+              ),
+            ),
+          ),
         ),
       ),
     );

@@ -177,16 +177,23 @@ class HigSectionHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: AppColors.textSecondary(context),
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+                color: AppColors.textSecondary(context),
+              ),
             ),
           ),
-          if (trailing != null) trailing!,
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing!,
+          ],
         ],
       ),
     );
@@ -327,6 +334,85 @@ class HigCurrencyHeroField extends StatelessWidget {
   }
 }
 
+/// Barra de progresso com microinteração suave (Apple HIG) para tetos e categorias.
+class HigAnimatedProgressBar extends StatelessWidget {
+  final double value;
+  final Color color;
+  final double minHeight;
+
+  const HigAnimatedProgressBar({
+    super.key,
+    required this.value,
+    required this.color,
+    this.minHeight = 6,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final target = value.clamp(0.0, 1.0);
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: target),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedValue, _) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(100),
+          child: LinearProgressIndicator(
+            value: animatedValue,
+            minHeight: minHeight,
+            backgroundColor: color.withValues(alpha: 0.13),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Pílula semântica à prova de overflow para destacar 'Seus gastos' vs 'Ignorados'.
+class HigInfoPill extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  const HigInfoPill({
+    super.key,
+    required this.icon,
+    required this.text,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
@@ -353,6 +439,19 @@ class AppTheme {
           fontWeight: FontWeight.w600,
           letterSpacing: -0.3,
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final isSelected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            letterSpacing: -0.2,
+            color: isSelected
+                ? AppColors.primary
+                : AppColors.lightTextSecondary,
+          );
+        }),
       ),
       cardTheme: CardThemeData(
         color: AppColors.lightSurface,
@@ -400,6 +499,19 @@ class AppTheme {
           fontWeight: FontWeight.w600,
           letterSpacing: -0.3,
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final isSelected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            letterSpacing: -0.2,
+            color: isSelected
+                ? AppColors.primaryLight
+                : AppColors.darkTextSecondary,
+          );
+        }),
       ),
       cardTheme: CardThemeData(
         color: AppColors.darkSurface,

@@ -783,20 +783,25 @@ class _UnifiedImportScreenState extends State<UnifiedImportScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          futureInstallmentsCount > 0
-                              ? '$selectedCount deste mês + $futureInstallmentsCount parcelas futuras'
-                              : '$selectedCount de ${_candidates.length} selecionados',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary(context),
+                        Flexible(
+                          child: Text(
+                            futureInstallmentsCount > 0
+                                ? '$selectedCount deste mês (+$futureInstallmentsCount parc.)'
+                                : '$selectedCount de ${_candidates.length} selecionados',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary(context),
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           _destination == ImportDestinationType.creditCard
-                              ? 'Total na Fatura: ${AppFormatters.currency(netImpact)}'
-                              : 'Saldo Líquido: ${AppFormatters.currency(netImpact)}',
+                              ? 'Fatura: ${AppFormatters.currency(netImpact)}'
+                              : 'Líquido: ${AppFormatters.currency(netImpact)}',
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w800,
