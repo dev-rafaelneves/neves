@@ -313,6 +313,10 @@ class SummaryTab extends StatelessWidget {
                 _CardInvoiceRow(
                   card: cards[i],
                   invoiceTotal: appState.cardInvoiceTotal(cards[i].id, ym),
+                  paidTotal: appState.cardPaidAmount(cards[i].id, ym),
+                  remainingTotal:
+                      appState.cardRemainingInvoiceAmount(cards[i].id, ym),
+                  isPaid: appState.isCardInvoicePaid(cards[i].id, ym),
                   ownTotal: appState.cardOwnExpenseTotal(cards[i].id, ym),
                   ignoredTotal:
                       appState.cardIgnoredExpenseTotal(cards[i].id, ym),
@@ -593,6 +597,9 @@ class _MetricTile extends StatelessWidget {
 class _CardInvoiceRow extends StatelessWidget {
   final CreditCardItem card;
   final double invoiceTotal;
+  final double paidTotal;
+  final double remainingTotal;
+  final bool isPaid;
   final double ownTotal;
   final double ignoredTotal;
   final int itemCount;
@@ -602,6 +609,9 @@ class _CardInvoiceRow extends StatelessWidget {
   const _CardInvoiceRow({
     required this.card,
     required this.invoiceTotal,
+    required this.paidTotal,
+    required this.remainingTotal,
+    required this.isPaid,
     required this.ownTotal,
     required this.ignoredTotal,
     required this.itemCount,
@@ -612,6 +622,7 @@ class _CardInvoiceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasIgnored = ignoredTotal.abs() > 0.005;
+    final hasPaid = paidTotal > 0.005;
 
     return InkWell(
       onTap: onTap,
@@ -620,7 +631,7 @@ class _CardInvoiceRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Linha 1: Ícone + Nome do Cartão à esquerda | Valor Total à direita
+            // Linha 1: Ícone + Nome do Cartão à esquerda | Valor Atual a Pagar à direita
             Row(
               children: [
                 Container(
@@ -651,13 +662,20 @@ class _CardInvoiceRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  AppFormatters.currency(invoiceTotal, discreet: discreet),
+                  isPaid
+                      ? 'Fatura Paga'
+                      : AppFormatters.currency(
+                          remainingTotal,
+                          discreet: discreet,
+                        ),
                   style: TextStyle(
                     fontSize: 16.5,
                     fontWeight: FontWeight.w800,
-                    color: invoiceTotal > 0
-                        ? AppColors.danger(context)
-                        : AppColors.textSecondary(context),
+                    color: isPaid
+                        ? AppColors.success(context)
+                        : (remainingTotal > 0
+                            ? AppColors.danger(context)
+                            : AppColors.textSecondary(context)),
                   ),
                 ),
               ],
@@ -694,7 +712,7 @@ class _CardInvoiceRow extends StatelessWidget {
               ),
             ),
 
-            if (hasIgnored) ...[
+            if (hasPaid || hasIgnored) ...[
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.only(left: 44),
@@ -702,18 +720,34 @@ class _CardInvoiceRow extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    HigInfoPill(
-                      icon: Icons.person_outline_rounded,
-                      text:
-                          'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)}',
-                      color: AppColors.primary,
-                    ),
-                    HigInfoPill(
-                      icon: Icons.visibility_off_outlined,
-                      text:
-                          'Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
-                      color: AppColors.orange,
-                    ),
+                    if (hasPaid) ...[
+                      HigInfoPill(
+                        icon: Icons.shopping_bag_outlined,
+                        text:
+                            'Compras: ${AppFormatters.currency(invoiceTotal, discreet: discreet)}',
+                        color: AppColors.textSecondary(context),
+                      ),
+                      HigInfoPill(
+                        icon: Icons.check_circle_outline_rounded,
+                        text:
+                            'Pago/Antecipado: ${AppFormatters.currency(paidTotal, discreet: discreet)}',
+                        color: AppColors.success(context),
+                      ),
+                    ],
+                    if (hasIgnored) ...[
+                      HigInfoPill(
+                        icon: Icons.person_outline_rounded,
+                        text:
+                            'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)}',
+                        color: AppColors.primary,
+                      ),
+                      HigInfoPill(
+                        icon: Icons.visibility_off_outlined,
+                        text:
+                            'Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
+                        color: AppColors.orange,
+                      ),
+                    ],
                   ],
                 ),
               ),

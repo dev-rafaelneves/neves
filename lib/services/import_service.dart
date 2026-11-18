@@ -30,6 +30,7 @@ class ImportCandidate {
   bool selected;
   bool isDuplicate;
   bool isIgnored;
+  bool isInvoicePayment;
   String? ignoreReason;
 
   ImportCandidate({
@@ -47,6 +48,7 @@ class ImportCandidate {
     this.selected = true,
     this.isDuplicate = false,
     this.isIgnored = false,
+    this.isInvoicePayment = false,
     this.ignoreReason,
   });
 
@@ -54,6 +56,7 @@ class ImportCandidate {
   bool get canProjectFuture =>
       destination == ImportDestinationType.creditCard &&
       !isCreditOrRefund &&
+      !isInvoicePayment &&
       installmentTotal > installmentIndex;
 }
 
@@ -113,7 +116,10 @@ class ImportService {
       final instIdx = inst?.index ?? 1;
       final instTotal = inst?.total ?? 1;
 
-      final ignoreReason = detectIgnoreReason(row.title);
+      final isEarlyPay =
+          defaultDestination == ImportDestinationType.creditCard &&
+              isEarlyInvoicePaymentTitle(row.title);
+      final ignoreReason = isEarlyPay ? null : detectIgnoreReason(row.title);
 
       final targetMonth = defaultDestination == ImportDestinationType.creditCard
           ? selectedInvoiceMonth
@@ -152,7 +158,7 @@ class ImportService {
           title: row.title,
           date: row.date,
           amount: row.amount,
-          isCreditOrRefund: row.isCreditOrRefund,
+          isCreditOrRefund: isEarlyPay ? true : row.isCreditOrRefund,
           destination: defaultDestination,
           cardId: defaultCardId,
           categoryId: suggestedCatId,
@@ -161,10 +167,12 @@ class ImportService {
           projectFutureInstallments:
               defaultDestination == ImportDestinationType.creditCard &&
                   !row.isCreditOrRefund &&
+                  !isEarlyPay &&
                   instTotal > instIdx &&
                   shouldSelect,
           selected: shouldSelect,
           isDuplicate: isDup,
+          isInvoicePayment: isEarlyPay,
           ignoreReason: ignoreReason,
         ),
       );
@@ -187,6 +195,11 @@ class ImportService {
       if (destination == ImportDestinationType.creditCard) {
         c.cardId = cardId;
       }
+      final isEarlyPay = destination == ImportDestinationType.creditCard &&
+          isEarlyInvoicePaymentTitle(c.title);
+      c.isInvoicePayment = isEarlyPay;
+      c.ignoreReason = isEarlyPay ? null : detectIgnoreReason(c.title);
+
       final targetMonth = destination == ImportDestinationType.creditCard
           ? selectedInvoiceMonth
           : AppFormatters.yearMonthFromDate(c.date);
@@ -219,9 +232,18 @@ class ImportService {
       c.projectFutureInstallments =
           destination == ImportDestinationType.creditCard &&
               !c.isCreditOrRefund &&
+              !c.isInvoicePayment &&
               c.installmentTotal > c.installmentIndex &&
               c.selected;
     }
+  }
+
+  /// Verifica se o título indica um Pagamento Antecipado / Adiantamento da fatura atual.
+  static bool isEarlyInvoicePaymentTitle(String title) {
+    final lower = _normalizeText(title);
+    return lower.contains('pagamento antecipado') ||
+        lower.contains('adiantamento de fatura') ||
+        lower.contains('antecipacao de fatura');
   }
 
   /// Detecta se a linha é Pagamento de Fatura ou Movimentação de Cofrinho/CDB/RDB.

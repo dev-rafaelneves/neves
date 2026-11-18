@@ -286,6 +286,7 @@ class TransactionItem {
   final int installmentTotal;
   final bool isRecurring;
   final bool isIgnored;
+  final bool isInvoicePayment;
 
   const TransactionItem({
     required this.id,
@@ -302,6 +303,7 @@ class TransactionItem {
     this.installmentTotal = 1,
     this.isRecurring = false,
     this.isIgnored = false,
+    this.isInvoicePayment = false,
   });
 
   bool get isInstallment => installmentTotal > 1;
@@ -325,6 +327,7 @@ class TransactionItem {
     int? installmentTotal,
     bool? isRecurring,
     bool? isIgnored,
+    bool? isInvoicePayment,
   }) {
     return TransactionItem(
       id: id ?? this.id,
@@ -341,6 +344,7 @@ class TransactionItem {
       installmentTotal: installmentTotal ?? this.installmentTotal,
       isRecurring: isRecurring ?? this.isRecurring,
       isIgnored: isIgnored ?? this.isIgnored,
+      isInvoicePayment: isInvoicePayment ?? this.isInvoicePayment,
     );
   }
 
@@ -359,21 +363,34 @@ class TransactionItem {
         'installmentTotal': installmentTotal,
         'isRecurring': isRecurring ? 1 : 0,
         'isIgnored': isIgnored ? 1 : 0,
+        'isInvoicePayment': isInvoicePayment ? 1 : 0,
       };
 
   factory TransactionItem.fromMap(Map<String, dynamic> map) {
     final parsedDate =
         DateTime.tryParse((map['date'] as String?) ?? '') ?? DateTime.now();
+    final rawTitle = (map['title'] as String?) ?? '';
+    final rawAmount = (map['amount'] as num?)?.toDouble() ?? 0.0;
+    final payment = PaymentMethod.fromString(map['paymentMethod'] as String?);
+    final explicitInvPay =
+        (map['isInvoicePayment'] == 1 || map['isInvoicePayment'] == true);
+    final lowerTitle = rawTitle.toLowerCase();
+    final autoInvPay = !explicitInvPay &&
+        payment == PaymentMethod.creditCard &&
+        (lowerTitle.contains('pagamento antecipado') ||
+            lowerTitle.contains('adiantamento de fatura') ||
+            lowerTitle.contains('pagamento da fatura'));
+    final isInvPay = explicitInvPay || autoInvPay;
+
     return TransactionItem(
       id: map['id'] as String,
-      title: (map['title'] as String?) ?? '',
-      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      title: rawTitle,
+      amount: isInvPay ? rawAmount.abs() : rawAmount,
       date: parsedDate,
       competenceMonth: (map['competenceMonth'] as String?) ??
           AppFormatters.yearMonthFromDate(parsedDate),
       type: TransactionType.fromString(map['type'] as String?),
-      paymentMethod:
-          PaymentMethod.fromString(map['paymentMethod'] as String?),
+      paymentMethod: payment,
       categoryId: (map['categoryId'] as String?) ?? 'cat_other_exp',
       cardId: map['cardId'] as String?,
       groupId: map['groupId'] as String?,
@@ -381,6 +398,7 @@ class TransactionItem {
       installmentTotal: (map['installmentTotal'] as num?)?.toInt() ?? 1,
       isRecurring: (map['isRecurring'] == 1 || map['isRecurring'] == true),
       isIgnored: (map['isIgnored'] == 1 || map['isIgnored'] == true),
+      isInvoicePayment: isInvPay,
     );
   }
 }

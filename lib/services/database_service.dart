@@ -46,7 +46,7 @@ class DatabaseService {
       final fullPath = p.join(dbPath, 'neves_mvp_v2.db');
       _db = await openDatabase(
         fullPath,
-        version: 3,
+        version: 4,
         onCreate: (db, version) async {
           await _createSchema(db);
           await _seedDefaults(db);
@@ -63,6 +63,13 @@ class DatabaseService {
             try {
               await db.execute(
                 'ALTER TABLE categories ADD COLUMN monthlyBudget REAL NOT NULL DEFAULT 0',
+              );
+            } catch (_) {}
+          }
+          if (oldVersion < 4) {
+            try {
+              await db.execute(
+                'ALTER TABLE transactions ADD COLUMN isInvoicePayment INTEGER NOT NULL DEFAULT 0',
               );
             } catch (_) {}
           }
@@ -205,7 +212,8 @@ class DatabaseService {
         installmentIndex INTEGER NOT NULL DEFAULT 1,
         installmentTotal INTEGER NOT NULL DEFAULT 1,
         isRecurring INTEGER NOT NULL DEFAULT 0,
-        isIgnored INTEGER NOT NULL DEFAULT 0
+        isIgnored INTEGER NOT NULL DEFAULT 0,
+        isInvoicePayment INTEGER NOT NULL DEFAULT 0
       )
     ''');
 

@@ -75,6 +75,12 @@ class _TransactionsTabState extends State<TransactionsTab> {
 
     double filteredSum = 0.0;
     for (final tx in items) {
+      if (tx.isInvoicePayment) {
+        if (selectedCard != null) {
+          filteredSum += tx.amount;
+        }
+        continue;
+      }
       if (tx.type == TransactionType.income) {
         filteredSum += tx.amount;
       } else {
@@ -279,26 +285,58 @@ class _TransactionsTabState extends State<TransactionsTab> {
                           ),
                         ),
                         if (appState
-                                .cardIgnoredExpenseTotal(selectedCard.id, ym)
-                                .abs() >
-                            0.005) ...[
+                                    .cardPaidAmount(selectedCard.id, ym)
+                                    .abs() >
+                                0.005 ||
+                            appState
+                                    .cardIgnoredExpenseTotal(
+                                      selectedCard.id,
+                                      ym,
+                                    )
+                                    .abs() >
+                                0.005) ...[
                           const SizedBox(height: 6),
                           Wrap(
                             spacing: 6,
                             runSpacing: 4,
                             children: [
-                              HigInfoPill(
-                                icon: Icons.person_outline_rounded,
-                                text:
-                                    'Seus gastos: ${AppFormatters.currency(appState.cardOwnExpenseTotal(selectedCard.id, ym), discreet: discreet)}',
-                                color: AppColors.primary,
-                              ),
-                              HigInfoPill(
-                                icon: Icons.visibility_off_outlined,
-                                text:
-                                    'Ignorados: ${AppFormatters.currency(appState.cardIgnoredExpenseTotal(selectedCard.id, ym), discreet: discreet)}',
-                                color: AppColors.orange,
-                              ),
+                              if (appState
+                                      .cardPaidAmount(selectedCard.id, ym)
+                                      .abs() >
+                                  0.005) ...[
+                                HigInfoPill(
+                                  icon: Icons.shopping_bag_outlined,
+                                  text:
+                                      'Compras: ${AppFormatters.currency(appState.cardInvoiceTotal(selectedCard.id, ym), discreet: discreet)}',
+                                  color: selectedCard.color,
+                                ),
+                                HigInfoPill(
+                                  icon: Icons.check_circle_outline_rounded,
+                                  text:
+                                      'Pago/Antecipado: ${AppFormatters.currency(appState.cardPaidAmount(selectedCard.id, ym), discreet: discreet)}',
+                                  color: AppColors.success(context),
+                                ),
+                              ],
+                              if (appState
+                                      .cardIgnoredExpenseTotal(
+                                        selectedCard.id,
+                                        ym,
+                                      )
+                                      .abs() >
+                                  0.005) ...[
+                                HigInfoPill(
+                                  icon: Icons.person_outline_rounded,
+                                  text:
+                                      'Seus gastos: ${AppFormatters.currency(appState.cardOwnExpenseTotal(selectedCard.id, ym), discreet: discreet)}',
+                                  color: AppColors.primary,
+                                ),
+                                HigInfoPill(
+                                  icon: Icons.visibility_off_outlined,
+                                  text:
+                                      'Ignorados: ${AppFormatters.currency(appState.cardIgnoredExpenseTotal(selectedCard.id, ym), discreet: discreet)}',
+                                  color: AppColors.orange,
+                                ),
+                              ],
                             ],
                           ),
                         ],
@@ -309,18 +347,25 @@ class _TransactionsTabState extends State<TransactionsTab> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        AppFormatters.currency(
-                          appState.cardInvoiceTotal(selectedCard.id, ym),
-                          discreet: discreet,
-                        ),
+                        appState.isCardInvoicePaid(selectedCard.id, ym)
+                            ? 'Fatura Paga'
+                            : AppFormatters.currency(
+                                appState.cardRemainingInvoiceAmount(
+                                  selectedCard.id,
+                                  ym,
+                                ),
+                                discreet: discreet,
+                              ),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.danger(context),
+                          color: appState.isCardInvoicePaid(selectedCard.id, ym)
+                              ? AppColors.success(context)
+                              : AppColors.danger(context),
                         ),
                       ),
                       Text(
-                        '${items.length} ${items.length == 1 ? 'compra' : 'compras'}',
+                        '${appState.cardInvoiceCount(selectedCard.id, ym)} ${appState.cardInvoiceCount(selectedCard.id, ym) == 1 ? 'compra' : 'compras'}',
                         style: TextStyle(
                           fontSize: 11.5,
                           color: AppColors.textSecondary(context),
@@ -328,7 +373,22 @@ class _TransactionsTabState extends State<TransactionsTab> {
                       ),
                     ],
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: 'Pagar Fatura',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => CardsTab.showPayInvoiceModal(
+                      context,
+                      appState,
+                      card: selectedCard!,
+                      yearMonth: ym,
+                    ),
+                    icon: Icon(
+                      Icons.payments_outlined,
+                      size: 20,
+                      color: AppColors.success(context),
+                    ),
+                  ),
                   IconButton(
                     tooltip: 'Editar Cartão',
                     visualDensity: VisualDensity.compact,
@@ -595,8 +655,10 @@ class _TransactionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isIncome = tx.type == TransactionType.income;
-    final isCardRefund = tx.type == TransactionType.expense && tx.amount < 0;
-    final isPositiveVisual = isIncome || isCardRefund;
+    final isInvPayment = tx.isInvoicePayment;
+    final isCardRefund =
+        !isInvPayment && tx.type == TransactionType.expense && tx.amount < 0;
+    final isPositiveVisual = isIncome || isCardRefund || isInvPayment;
     final amountColor = tx.isIgnored
         ? AppColors.textSecondary(context)
         : (isPositiveVisual
@@ -616,7 +678,9 @@ class _TransactionTile extends StatelessWidget {
         side: BorderSide(
           color: tx.isIgnored
               ? AppColors.orange.withValues(alpha: 0.45)
-              : AppColors.border(context),
+              : (isInvPayment
+                  ? AppColors.success(context).withValues(alpha: 0.4)
+                  : AppColors.border(context)),
           width: 0.8,
         ),
       ),
@@ -631,15 +695,19 @@ class _TransactionTile extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: category.color
+                  color: (isInvPayment
+                          ? AppColors.success(context)
+                          : category.color)
                       .withValues(alpha: tx.isIgnored ? 0.08 : 0.14),
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: Icon(
-                  category.icon,
+                  isInvPayment ? Icons.payments_rounded : category.icon,
                   color: tx.isIgnored
                       ? AppColors.textSecondary(context)
-                      : category.color,
+                      : (isInvPayment
+                          ? AppColors.success(context)
+                          : category.color),
                   size: 20,
                 ),
               ),
@@ -664,7 +732,13 @@ class _TransactionTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (isCardRefund) ...[
+                        if (isInvPayment) ...[
+                          const SizedBox(width: 6),
+                          _SmallTag(
+                            text: 'Pagamento Fatura',
+                            color: AppColors.success(context),
+                          ),
+                        ] else if (isCardRefund) ...[
                           const SizedBox(width: 6),
                           _SmallTag(
                             text: 'Estorno',
@@ -688,7 +762,9 @@ class _TransactionTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${category.name} • $paymentBadge • ${AppFormatters.dayMonth(tx.date)}',
+                      isInvPayment
+                          ? 'Abatimento na fatura • $paymentBadge • ${AppFormatters.dayMonth(tx.date)}'
+                          : '${category.name} • $paymentBadge • ${AppFormatters.dayMonth(tx.date)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -718,68 +794,70 @@ class _TransactionTile extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  // Botão toggle ativo/inativo 'Ignorar' com área de toque segura e Semantics
-                  Semantics(
-                    button: true,
-                    toggled: tx.isIgnored,
-                    label: tx.isIgnored ? 'Ignorar ativo' : 'Ignorar inativo',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: onToggleIgnore,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          minHeight: 32,
-                          minWidth: 72,
-                        ),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 140),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 5,
+                  if (!isInvPayment) ...[
+                    const SizedBox(height: 5),
+                    // Botão toggle ativo/inativo 'Ignorar' com área de toque segura e Semantics
+                    Semantics(
+                      button: true,
+                      toggled: tx.isIgnored,
+                      label: tx.isIgnored ? 'Ignorar ativo' : 'Ignorar inativo',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: onToggleIgnore,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minHeight: 32,
+                            minWidth: 72,
                           ),
-                          decoration: BoxDecoration(
-                            color: tx.isIgnored
-                                ? AppColors.orange
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 140),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
                               color: tx.isIgnored
                                   ? AppColors.orange
-                                  : AppColors.border(context),
-                              width: 0.9,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                tx.isIgnored
-                                    ? Icons.visibility_off_rounded
-                                    : Icons.visibility_off_outlined,
-                                size: 12,
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
                                 color: tx.isIgnored
-                                    ? Colors.white
-                                    : AppColors.textSecondary(context),
+                                    ? AppColors.orange
+                                    : AppColors.border(context),
+                                width: 0.9,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Ignorar',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  tx.isIgnored
+                                      ? Icons.visibility_off_rounded
+                                      : Icons.visibility_off_outlined,
+                                  size: 12,
                                   color: tx.isIgnored
                                       ? Colors.white
                                       : AppColors.textSecondary(context),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Ignorar',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: tx.isIgnored
+                                        ? Colors.white
+                                        : AppColors.textSecondary(context),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ],

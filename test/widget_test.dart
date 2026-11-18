@@ -364,6 +364,45 @@ date;title;amount
     expect(candidates[1].amount, 8.0);
     expect(candidates[4].title, 'AGROPECUARIA CERRADO');
     expect(candidates[4].amount, 77.0);
+
+    // Linha 18: '09/11/2026;Pagamento antecipado;-680,41' deve ser reconhecida como Pagamento Antecipado da Fatura
+    final earlyPay =
+        candidates.firstWhere((c) => c.title == 'Pagamento antecipado');
+    expect(earlyPay.isInvoicePayment, isTrue);
+    expect(earlyPay.selected, isTrue);
+    expect(earlyPay.amount, 680.41);
+
+    await state.commitImportedCandidates(
+      candidates: candidates,
+      selectedInvoiceMonth: '2026-11',
+    );
+
+    // Total de compras na fatura = R$ 2.508,91
+    expect(state.cardInvoiceTotal(cardId, '2026-11'), closeTo(2508.91, 0.01));
+    // Total antecipado = R$ 680,41
+    expect(state.cardPaidAmount(cardId, '2026-11'), closeTo(680.41, 0.01));
+    // Saldo atual a pagar no banco = 2508,91 - 680,41 = R$ 1.828,50
+    expect(
+      state.cardRemainingInvoiceAmount(cardId, '2026-11'),
+      closeTo(1828.50, 0.01),
+    );
+    // Gastos pessoais do mês no cartão continuam R$ 2.508,91 (pagar antecipado não apaga as despesas)
+    expect(state.monthCardExpense('2026-11'), closeTo(2508.91, 0.01));
+
+    // Registra o pagamento total do restante da fatura (R$ 1.828,50)
+    await state.registerCardInvoicePayment(
+      cardId: cardId,
+      competenceMonth: '2026-11',
+      amount: 1828.50,
+      isFullPayment: true,
+    );
+
+    expect(
+      state.cardRemainingInvoiceAmount(cardId, '2026-11'),
+      closeTo(0.0, 0.01),
+    );
+    expect(state.isCardInvoicePaid(cardId, '2026-11'), isTrue);
+    expect(state.monthCardExpense('2026-11'), closeTo(2508.91, 0.01));
   });
 
   testWidgets('Renderiza as 5 abas do MVP e o cabeçalho em 2 linhas',

@@ -375,8 +375,9 @@ class _UnifiedImportScreenState extends State<UnifiedImportScreen> {
       if (c.destination == ImportDestinationType.checking) {
         netImpact += c.isCreditOrRefund ? c.amount : -c.amount;
       } else {
-        // Na fatura do cartão: compras somam na fatura, estornos abatem da fatura
-        netImpact += c.isCreditOrRefund ? -c.amount : c.amount;
+        // Na fatura do cartão: compras somam na fatura, estornos e pagamentos antecipados abatem da fatura
+        netImpact +=
+            (c.isCreditOrRefund || c.isInvoicePayment) ? -c.amount : c.amount;
         if (c.canProjectFuture && c.projectFutureInstallments) {
           futureInstallmentsCount += (c.installmentTotal - c.installmentIndex);
         }
@@ -941,13 +942,18 @@ class _CandidateCard extends StatelessWidget {
     final card = appState.cardById(candidate.cardId);
 
     // Determina rótulo e cor do valor conforme o destino
-    final bool isPositiveDisplay = candidate.isCreditOrRefund;
+    final bool isPositiveDisplay =
+        candidate.isCreditOrRefund || candidate.isInvoicePayment;
     final Color amountColor = isPositiveDisplay
         ? AppColors.success(context)
         : AppColors.danger(context);
     final String signPrefix = isPositiveDisplay ? '+' : '-';
     final String typeLabel = isCard
-        ? (candidate.isCreditOrRefund ? 'Estorno na Fatura' : 'Compra Cartão')
+        ? (candidate.isInvoicePayment
+            ? 'Pagamento Antecipado'
+            : (candidate.isCreditOrRefund
+                ? 'Estorno na Fatura'
+                : 'Compra Cartão'))
         : (candidate.isCreditOrRefund ? 'Receita (+)' : 'Saída Conta');
 
     return Opacity(
@@ -1038,13 +1044,21 @@ class _CandidateCard extends StatelessWidget {
                 ],
               ),
 
-              // Avisos de Ignorado Automático ou Duplicata
-              if (candidate.ignoreReason != null || candidate.isDuplicate) ...[
+              // Avisos de Pagamento Antecipado, Ignorado Automático ou Duplicata
+              if (candidate.isInvoicePayment ||
+                  candidate.ignoreReason != null ||
+                  candidate.isDuplicate) ...[
                 Padding(
                   padding: const EdgeInsets.only(left: 40, top: 4, bottom: 4),
                   child: Wrap(
                     spacing: 6,
                     children: [
+                      if (candidate.isInvoicePayment)
+                        _StatusBadge(
+                          icon: Icons.payments_rounded,
+                          text: 'Pagamento da Fatura (abate saldo a pagar)',
+                          color: AppColors.success(context),
+                        ),
                       if (candidate.ignoreReason != null)
                         _StatusBadge(
                           icon: Icons.filter_alt_off_rounded,

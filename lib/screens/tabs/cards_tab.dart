@@ -80,6 +80,10 @@ class CardsTab extends StatelessWidget {
               card: card,
               yearMonth: ym,
               invoiceTotal: appState.cardInvoiceTotal(card.id, ym),
+              paidTotal: appState.cardPaidAmount(card.id, ym),
+              remainingTotal:
+                  appState.cardRemainingInvoiceAmount(card.id, ym),
+              isPaid: appState.isCardInvoicePaid(card.id, ym),
               ownTotal: appState.cardOwnExpenseTotal(card.id, ym),
               ignoredTotal: appState.cardIgnoredExpenseTotal(card.id, ym),
               itemCount: appState.cardInvoiceCount(card.id, ym),
@@ -93,6 +97,12 @@ class CardsTab extends StatelessWidget {
                 appState: appState,
                 initialDestination: ImportDestinationType.creditCard,
                 initialCardId: card.id,
+              ),
+              onPayInvoice: () => showPayInvoiceModal(
+                context,
+                appState,
+                card: card,
+                yearMonth: ym,
               ),
               onEdit: () => showCardModal(context, appState, existing: card),
             ),
@@ -118,36 +128,64 @@ class CardsTab extends StatelessWidget {
       ),
     );
   }
+
+  static Future<void> showPayInvoiceModal(
+    BuildContext context,
+    AppState appState, {
+    required CreditCardItem card,
+    required String yearMonth,
+  }) async {
+    HapticFeedback.selectionClick();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PayInvoiceSheet(
+        appState: appState,
+        card: card,
+        yearMonth: yearMonth,
+      ),
+    );
+  }
 }
 
 class _CreditCardDetailCard extends StatelessWidget {
   final CreditCardItem card;
   final String yearMonth;
   final double invoiceTotal;
+  final double paidTotal;
+  final double remainingTotal;
+  final bool isPaid;
   final double ownTotal;
   final double ignoredTotal;
   final int itemCount;
   final bool discreet;
   final VoidCallback onViewInvoice;
   final VoidCallback onImportInvoice;
+  final VoidCallback onPayInvoice;
   final VoidCallback onEdit;
 
   const _CreditCardDetailCard({
     required this.card,
     required this.yearMonth,
     required this.invoiceTotal,
+    required this.paidTotal,
+    required this.remainingTotal,
+    required this.isPaid,
     required this.ownTotal,
     required this.ignoredTotal,
     required this.itemCount,
     required this.discreet,
     required this.onViewInvoice,
     required this.onImportInvoice,
+    required this.onPayInvoice,
     required this.onEdit,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasIgnored = ignoredTotal.abs() > 0.005;
+    final hasPaid = paidTotal > 0.005;
 
     return HigGroupedCard(
       padding: const EdgeInsets.all(16),
@@ -219,13 +257,17 @@ class _CreditCardDetailCard extends StatelessWidget {
               children: [
                 Flexible(
                   child: Text(
-                    'Fatura de ${AppFormatters.monthLabel(yearMonth, short: true)} ($itemCount ${itemCount == 1 ? 'compra' : 'compras'})',
+                    isPaid
+                        ? 'Fatura de ${AppFormatters.monthLabel(yearMonth, short: true)} • PAGA'
+                        : 'Fatura Atual (${AppFormatters.monthLabel(yearMonth, short: true)} • $itemCount ${itemCount == 1 ? 'compra' : 'compras'})',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary(context),
+                      fontWeight: FontWeight.w700,
+                      color: isPaid
+                          ? AppColors.success(context)
+                          : AppColors.textSecondary(context),
                     ),
                   ),
                 ),
@@ -233,36 +275,57 @@ class _CreditCardDetailCard extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    AppFormatters.currency(invoiceTotal, discreet: discreet),
+                    AppFormatters.currency(
+                      remainingTotal,
+                      discreet: discreet,
+                    ),
                     style: TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
-                      color: invoiceTotal > 0
-                          ? AppColors.danger(context)
-                          : AppColors.textPrimary(context),
+                      color: isPaid
+                          ? AppColors.success(context)
+                          : (remainingTotal > 0
+                              ? AppColors.danger(context)
+                              : AppColors.textPrimary(context)),
                     ),
                   ),
                 ),
               ],
             ),
-            if (hasIgnored) ...[
+            if (hasPaid || hasIgnored) ...[
               const SizedBox(height: 8),
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  HigInfoPill(
-                    icon: Icons.person_outline_rounded,
-                    text:
-                        'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)}',
-                    color: AppColors.primary,
-                  ),
-                  HigInfoPill(
-                    icon: Icons.visibility_off_outlined,
-                    text:
-                        'Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
-                    color: AppColors.orange,
-                  ),
+                  if (hasPaid) ...[
+                    HigInfoPill(
+                      icon: Icons.shopping_bag_outlined,
+                      text:
+                          'Compras: ${AppFormatters.currency(invoiceTotal, discreet: discreet)}',
+                      color: AppColors.textSecondary(context),
+                    ),
+                    HigInfoPill(
+                      icon: Icons.check_circle_outline_rounded,
+                      text:
+                          'Pago/Antecipado: ${AppFormatters.currency(paidTotal, discreet: discreet)}',
+                      color: AppColors.success(context),
+                    ),
+                  ],
+                  if (hasIgnored) ...[
+                    HigInfoPill(
+                      icon: Icons.person_outline_rounded,
+                      text:
+                          'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)}',
+                      color: AppColors.primary,
+                    ),
+                    HigInfoPill(
+                      icon: Icons.visibility_off_outlined,
+                      text:
+                          'Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
+                      color: AppColors.orange,
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -270,10 +333,35 @@ class _CreditCardDetailCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      minimumSize: const Size.fromHeight(40),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: onPayInvoice,
+                    icon: const Icon(Icons.payments_outlined, size: 16),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Pagar Fatura',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(40),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -283,7 +371,7 @@ class _CreditCardDetailCard extends StatelessWidget {
                     label: const FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        'Importar Fatura',
+                        'Importar',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
@@ -292,12 +380,12 @@ class _CreditCardDetailCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
                   child: FilledButton.tonalIcon(
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(40),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -584,6 +672,275 @@ class _DaySelectorBox extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PayInvoiceSheet extends StatefulWidget {
+  final AppState appState;
+  final CreditCardItem card;
+  final String yearMonth;
+
+  const _PayInvoiceSheet({
+    required this.appState,
+    required this.card,
+    required this.yearMonth,
+  });
+
+  @override
+  State<_PayInvoiceSheet> createState() => _PayInvoiceSheetState();
+}
+
+class _PayInvoiceSheetState extends State<_PayInvoiceSheet> {
+  late final TextEditingController _amountCtrl;
+  String? _errorText;
+
+  double get _purchasesTotal =>
+      widget.appState.cardInvoiceTotal(widget.card.id, widget.yearMonth);
+  double get _alreadyPaid =>
+      widget.appState.cardPaidAmount(widget.card.id, widget.yearMonth);
+  double get _remainingAmount => widget.appState
+      .cardRemainingInvoiceAmount(widget.card.id, widget.yearMonth);
+
+  @override
+  void initState() {
+    super.initState();
+    final initialVal = _remainingAmount > 0 ? _remainingAmount : 0.0;
+    _amountCtrl = TextEditingController(
+      text: initialVal > 0
+          ? CentavosCurrencyFormatter.formatDouble(initialVal)
+          : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitPayment({double? overrideAmount}) async {
+    final val = overrideAmount ??
+        CentavosCurrencyFormatter.parseValue(_amountCtrl.text);
+    if (val <= 0) {
+      setState(() => _errorText = 'Informe um valor maior que R\$ 0,00.');
+      return;
+    }
+
+    final isFull =
+        _remainingAmount > 0 && (val >= _remainingAmount - 0.009);
+
+    HapticFeedback.mediumImpact();
+    await widget.appState.registerCardInvoicePayment(
+      cardId: widget.card.id,
+      competenceMonth: widget.yearMonth,
+      amount: val,
+      isFullPayment: isFull,
+    );
+
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final inset = MediaQuery.of(context).viewInsets.bottom;
+    final typedVal = CentavosCurrencyFormatter.parseValue(_amountCtrl.text);
+    final remaining = _remainingAmount;
+    final isFullSelected =
+        remaining > 0 && (typedVal >= remaining - 0.009);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 22 + inset),
+      decoration: BoxDecoration(
+        color: AppColors.surface(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: widget.card.color.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.credit_card_rounded,
+                      color: widget.card.color,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pagar Fatura • ${widget.card.name}',
+                          style: const TextStyle(
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          'Competência ${AppFormatters.monthLabel(widget.yearMonth, short: true)} • Total compras: ${AppFormatters.currency(_purchasesTotal)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Resumo Rápido de Saldo da Fatura
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.isDark(context)
+                      ? AppColors.darkBackground
+                      : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.border(context),
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Já Pago / Antecipado',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textSecondary(context),
+                          ),
+                        ),
+                        Text(
+                          AppFormatters.currency(_alreadyPaid),
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.success(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Restante a Pagar no Banco',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textSecondary(context),
+                          ),
+                        ),
+                        Text(
+                          AppFormatters.currency(remaining),
+                          style: TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w800,
+                            color: remaining > 0.005
+                                ? AppColors.danger(context)
+                                : AppColors.success(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              HigCurrencyHeroField(
+                controller: _amountCtrl,
+                label: isFullSelected
+                    ? 'Valor para Quitar Fatura Total'
+                    : 'Valor do Pagamento Antecipado / Parcial',
+                accentColor: AppColors.primary,
+                onChanged: (_) {
+                  setState(() => _errorText = null);
+                },
+                bottomAccessory: remaining > 0.005 && !isFullSelected
+                    ? TextButton.icon(
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            _amountCtrl.text =
+                                CentavosCurrencyFormatter.formatDouble(
+                              remaining,
+                            );
+                          });
+                        },
+                        icon: const Icon(Icons.done_all_rounded, size: 16),
+                        label: Text(
+                          'Preencher restante total (${AppFormatters.currency(remaining)})',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      )
+                    : null,
+              ),
+
+              if (_errorText != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _errorText!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.danger(context),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+
+              SizedBox(
+                height: 50,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () => _submitPayment(),
+                  icon: const Icon(Icons.check_circle_outline_rounded),
+                  label: Text(
+                    isFullSelected
+                        ? 'Quitar Fatura Total (${AppFormatters.currency(typedVal)})'
+                        : 'Registrar Pagamento Antecipado',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

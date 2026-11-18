@@ -147,21 +147,22 @@ class AppState extends ChangeNotifier {
     return _transactions.where((t) => t.competenceMonth == target).toList();
   }
 
-  /// Total de Receitas do mês (exclui itens com Ignorar ativo)
+  /// Total de Receitas do mês (exclui itens com Ignorar ativo e pagamentos de fatura)
   double monthIncome([String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
     for (final t in _transactions) {
       if (t.competenceMonth == target &&
           t.type == TransactionType.income &&
-          !t.isIgnored) {
+          !t.isIgnored &&
+          !t.isInvoicePayment) {
         sum += t.amount;
       }
     }
     return sum;
   }
 
-  /// Total de Gastos à Vista (Pix / Débito) no mês (exclui itens com Ignorar ativo)
+  /// Total de Gastos de Conta Corrente no mês (exclui itens com Ignorar ativo e pagamentos de fatura)
   double monthCashExpense([String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
@@ -169,14 +170,15 @@ class AppState extends ChangeNotifier {
       if (t.competenceMonth == target &&
           t.type == TransactionType.expense &&
           t.paymentMethod == PaymentMethod.cash &&
-          !t.isIgnored) {
+          !t.isIgnored &&
+          !t.isInvoicePayment) {
         sum += t.amount;
       }
     }
     return sum;
   }
 
-  /// Total de Gastos Próprios em Faturas de Cartão no mês (exclui itens com Ignorar ativo)
+  /// Total de Gastos Próprios em Faturas de Cartão no mês (exclui itens com Ignorar ativo e pagamentos de fatura)
   double monthCardExpense([String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
@@ -184,28 +186,30 @@ class AppState extends ChangeNotifier {
       if (t.competenceMonth == target &&
           t.type == TransactionType.expense &&
           t.paymentMethod == PaymentMethod.creditCard &&
-          !t.isIgnored) {
+          !t.isIgnored &&
+          !t.isInvoicePayment) {
         sum += t.amount;
       }
     }
     return sum;
   }
 
-  /// Total da Fatura do Banco de todos os cartões no mês (inclui próprios + ignorados)
+  /// Total de Compras da Fatura do Banco de todos os cartões no mês (inclui próprios + ignorados, sem abater pagamentos)
   double monthAllCardsBankInvoiceTotal([String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
     for (final t in _transactions) {
       if (t.competenceMonth == target &&
           t.type == TransactionType.expense &&
-          t.paymentMethod == PaymentMethod.creditCard) {
+          t.paymentMethod == PaymentMethod.creditCard &&
+          !t.isInvoicePayment) {
         sum += t.amount;
       }
     }
     return sum;
   }
 
-  /// Total de Saídas Próprias do mês (Gastos à Vista + Gastos Próprios em Faturas)
+  /// Total de Saídas Próprias do mês (Conta Corrente + Gastos Próprios em Faturas)
   double monthTotalExpense([String? ym]) {
     return monthCashExpense(ym) + monthCardExpense(ym);
   }
@@ -215,7 +219,7 @@ class AppState extends ChangeNotifier {
     return monthIncome(ym) - monthTotalExpense(ym);
   }
 
-  /// Total da fatura do banco de um cartão específico no mês (soma próprios + ignorados para bater com o banco)
+  /// Total de compras da fatura de um cartão específico no mês (soma próprios + ignorados, antes de pagamentos)
   double cardInvoiceTotal(String cardId, [String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
@@ -223,11 +227,41 @@ class AppState extends ChangeNotifier {
       if (t.competenceMonth == target &&
           t.type == TransactionType.expense &&
           t.paymentMethod == PaymentMethod.creditCard &&
-          t.cardId == cardId) {
+          t.cardId == cardId &&
+          !t.isInvoicePayment) {
         sum += t.amount;
       }
     }
     return sum;
+  }
+
+  /// Total já pago ou antecipado na fatura de um cartão específico no mês
+  double cardPaidAmount(String cardId, [String? ym]) {
+    final target = ym ?? _selectedYearMonth;
+    double sum = 0.0;
+    for (final t in _transactions) {
+      if (t.competenceMonth == target &&
+          t.paymentMethod == PaymentMethod.creditCard &&
+          t.cardId == cardId &&
+          t.isInvoicePayment) {
+        sum += t.amount.abs();
+      }
+    }
+    return sum;
+  }
+
+  /// Valor Atual a Pagar na fatura do cartão (Total de compras da fatura menos Pagamentos antecipados/totais)
+  double cardRemainingInvoiceAmount(String cardId, [String? ym]) {
+    final totalPurchases = cardInvoiceTotal(cardId, ym);
+    final paid = cardPaidAmount(cardId, ym);
+    final remaining = totalPurchases - paid;
+    return remaining < 0 && remaining > -0.005 ? 0.0 : remaining;
+  }
+
+  /// Indica se a fatura do cartão possui compras no mês e já está 100% quitada
+  bool isCardInvoicePaid(String cardId, [String? ym]) {
+    final purchases = cardInvoiceTotal(cardId, ym);
+    return purchases > 0.005 && cardRemainingInvoiceAmount(cardId, ym) <= 0.005;
   }
 
   /// Total apenas dos SEUS gastos (não ignorados) na fatura de um cartão no mês
@@ -239,7 +273,8 @@ class AppState extends ChangeNotifier {
           t.type == TransactionType.expense &&
           t.paymentMethod == PaymentMethod.creditCard &&
           t.cardId == cardId &&
-          !t.isIgnored) {
+          !t.isIgnored &&
+          !t.isInvoicePayment) {
         sum += t.amount;
       }
     }
@@ -255,14 +290,15 @@ class AppState extends ChangeNotifier {
           t.type == TransactionType.expense &&
           t.paymentMethod == PaymentMethod.creditCard &&
           t.cardId == cardId &&
-          t.isIgnored) {
+          t.isIgnored &&
+          !t.isInvoicePayment) {
         sum += t.amount;
       }
     }
     return sum;
   }
 
-  /// Quantidade de lançamentos na fatura de um cartão no mês
+  /// Quantidade de compras na fatura de um cartão no mês (exclui registros de pagamento)
   int cardInvoiceCount(String cardId, [String? ym]) {
     final target = ym ?? _selectedYearMonth;
     int count = 0;
@@ -270,7 +306,8 @@ class AppState extends ChangeNotifier {
       if (t.competenceMonth == target &&
           t.type == TransactionType.expense &&
           t.paymentMethod == PaymentMethod.creditCard &&
-          t.cardId == cardId) {
+          t.cardId == cardId &&
+          !t.isInvoicePayment) {
         count++;
       }
     }
@@ -297,6 +334,7 @@ class AppState extends ChangeNotifier {
       if (t.competenceMonth == target &&
           t.type == TransactionType.expense &&
           !t.isIgnored &&
+          !t.isInvoicePayment &&
           budgetedIds.contains(t.categoryId)) {
         sum += t.amount;
       }
@@ -304,7 +342,7 @@ class AppState extends ChangeNotifier {
     return sum;
   }
 
-  /// Lançamentos de uma categoria específica no mês (exclui ignorados)
+  /// Lançamentos de uma categoria específica no mês (exclui ignorados e pagamentos de fatura)
   List<TransactionItem> transactionsForCategoryInMonth(
     String categoryId, [
     String? ym,
@@ -315,26 +353,28 @@ class AppState extends ChangeNotifier {
           (t) =>
               t.competenceMonth == target &&
               t.categoryId == categoryId &&
-              !t.isIgnored,
+              !t.isIgnored &&
+              !t.isInvoicePayment,
         )
         .toList();
   }
 
-  /// Soma do valor de uma categoria específica no mês (exclui ignorados)
+  /// Soma do valor de uma categoria específica no mês (exclui ignorados e pagamentos de fatura)
   double categoryMonthlyAmount(String categoryId, [String? ym]) {
     final target = ym ?? _selectedYearMonth;
     double sum = 0.0;
     for (final t in _transactions) {
       if (t.competenceMonth == target &&
           t.categoryId == categoryId &&
-          !t.isIgnored) {
+          !t.isIgnored &&
+          !t.isInvoicePayment) {
         sum += t.amount;
       }
     }
     return sum < 0 ? 0.0 : sum;
   }
 
-  /// Resumo de despesas por categoria no mês (inclui categorias com teto mesmo com R$ 0 gastos, e exclui itens com Ignorar ativo)
+  /// Resumo de despesas por categoria no mês (inclui categorias com teto mesmo com R$ 0 gastos, e exclui itens com Ignorar ativo ou pagamentos de fatura)
   List<CategoryExpenseSummary> expensesByCategory([String? ym]) {
     final target = ym ?? _selectedYearMonth;
 
@@ -344,7 +384,8 @@ class AppState extends ChangeNotifier {
     for (final t in _transactions) {
       if (t.competenceMonth == target &&
           t.type == TransactionType.expense &&
-          !t.isIgnored) {
+          !t.isIgnored &&
+          !t.isInvoicePayment) {
         sums[t.categoryId] = (sums[t.categoryId] ?? 0.0) + t.amount;
         counts[t.categoryId] = (counts[t.categoryId] ?? 0) + 1;
       }
@@ -593,6 +634,33 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Registra um Pagamento Antecipado ou Pagamento Total na fatura de um cartão de crédito.
+  Future<void> registerCardInvoicePayment({
+    required String cardId,
+    required String competenceMonth,
+    required double amount,
+    required bool isFullPayment,
+    DateTime? date,
+  }) async {
+    if (amount <= 0) return;
+    final tx = TransactionItem(
+      id: _uuid.v4(),
+      title: isFullPayment ? 'Pagamento da fatura' : 'Pagamento antecipado',
+      amount: amount.abs(),
+      date: date ?? DateTime.now(),
+      competenceMonth: competenceMonth,
+      type: TransactionType.expense,
+      paymentMethod: PaymentMethod.creditCard,
+      categoryId: 'cat_other_exp',
+      cardId: cardId,
+      isInvoicePayment: true,
+    );
+    await DatabaseService.instance.upsertTransactionsBatch([tx]);
+    _transactions.add(tx);
+    _sortTransactions();
+    notifyListeners();
+  }
+
   /// Salva em lote os candidatos selecionados no Importador Unificado.
   /// Retorna a quantidade de lançamentos criados (incluindo parcelas futuras projetadas).
   Future<int> commitImportedCandidates({
@@ -629,6 +697,26 @@ class AppState extends ChangeNotifier {
         // Fatura de Cartão de Crédito
         final effectiveCardId =
             c.cardId ?? (_cards.isNotEmpty ? _cards.first.id : null);
+
+        if (c.isInvoicePayment) {
+          // Pagamento Antecipado / Pagamento da Fatura
+          toSave.add(
+            TransactionItem(
+              id: _uuid.v4(),
+              title: c.title.trim(),
+              amount: c.amount.abs(),
+              date: c.date,
+              competenceMonth: selectedInvoiceMonth,
+              type: TransactionType.expense,
+              paymentMethod: PaymentMethod.creditCard,
+              categoryId: c.categoryId,
+              cardId: effectiveCardId,
+              isInvoicePayment: true,
+            ),
+          );
+          continue;
+        }
+
         // Estorno/crédito na fatura entra com valor negativo para abater do total da fatura
         final signedExpenseAmount =
             c.isCreditOrRefund ? -c.amount : c.amount;
