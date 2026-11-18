@@ -284,9 +284,9 @@ class TransactionItem {
   final String? groupId; // Compartilhado entre parcelas da mesma compra ou recorrências fixas
   final int installmentIndex;
   final int installmentTotal;
-  final bool isRecurring;
-  final bool isIgnored;
-  final bool isInvoicePayment;
+  final bool? _isRecurring;
+  final bool? _isIgnored;
+  final bool? _isInvoicePayment;
 
   const TransactionItem({
     required this.id,
@@ -301,10 +301,29 @@ class TransactionItem {
     this.groupId,
     this.installmentIndex = 1,
     this.installmentTotal = 1,
-    this.isRecurring = false,
-    this.isIgnored = false,
-    this.isInvoicePayment = false,
-  });
+    bool isRecurring = false,
+    bool isIgnored = false,
+    bool isInvoicePayment = false,
+  })  : _isRecurring = isRecurring,
+        _isIgnored = isIgnored,
+        _isInvoicePayment = isInvoicePayment;
+
+  bool get isRecurring => _isRecurring ?? false;
+  bool get isIgnored => _isIgnored ?? false;
+  bool get isInvoicePayment {
+    if (_isInvoicePayment == true) return true;
+    if (paymentMethod == PaymentMethod.creditCard) {
+      final lower = title.toLowerCase();
+      if (lower.contains('pagamento antecipado') ||
+          lower.contains('adiantamento de fatura') ||
+          lower.contains('antecipação de fatura') ||
+          lower.contains('antecipacao de fatura') ||
+          lower.contains('pagamento da fatura')) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   bool get isInstallment => installmentTotal > 1;
   bool get isCreditCard =>

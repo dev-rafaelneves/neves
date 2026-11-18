@@ -1,65 +1,138 @@
+import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+/// Design Tokens oficiais inspirados no Apple Human Interface Guidelines (HIG),
+/// Apple Wallet, Copilot Money e Revolut.
 class AppColors {
-  // Light Mode (Apple HIG)
+  // Light Mode (iOS System Grouped Background)
   static const Color lightBackground = Color(0xFFF2F2F7);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightBorder = Color(0xFFE2E8F0);
-  static const Color lightTextPrimary = Color(0xFF0F172A);
-  static const Color lightTextSecondary = Color(0xFF64748B);
+  static const Color lightSecondarySurface = Color(0xFFF2F2F7);
+  static const Color lightBorder = Color(0xFFE5E5EA);
+  static const Color lightTextPrimary = Color(0xFF000000);
+  static const Color lightTextSecondary = Color(0xFF8E8E93);
 
-  // Dark Mode (Slate Palette)
-  static const Color darkBackground = Color(0xFF020617);
-  static const Color darkSurface = Color(0xFF0F172A);
-  static const Color darkBorder = Color(0xFF1E293B);
-  static const Color darkTextPrimary = Color(0xFFF8FAFC);
-  static const Color darkTextSecondary = Color(0xFF94A3B8);
+  // Dark Mode (OLED Pure Black + Secondary System Background)
+  static const Color darkBackground = Color(0xFF000000);
+  static const Color darkSurface = Color(0xFF1C1C1E);
+  static const Color darkSecondarySurface = Color(0xFF2C2C2E);
+  static const Color darkBorder = Color(0xFF2C2C2E);
+  static const Color darkTextPrimary = Color(0xFFFFFFFF);
+  static const Color darkTextSecondary = Color(0xFF8E8E93);
 
-  // Accents
-  static const Color primary = Color(0xFF059669); // emerald-600
-  static const Color primaryLight = Color(0xFF10B981); // emerald-500
-  static const Color primarySoft = Color(0xFFECFDF5);
-  static const Color emerald = Color(0xFF10B981);
-  static const Color orange = Color(0xFFF97316);
-  static const Color rose = Color(0xFFF43F5E);
-  static const Color blue = Color(0xFF3B82F6);
-  static const Color purple = Color(0xFF8B5CF6);
-  static const Color cyan = Color(0xFF06B6D4);
-  static const Color amber = Color(0xFFF59E0B);
-  static const Color indigo = Color(0xFF6366F1);
+  // Cores Semânticas Financeiras (Padrão iOS HIG)
+  static const Color iosGreen = Color(0xFF34C759); // Receitas / Positivo
+  static const Color iosRed = Color(0xFFFF3B30); // Despesas / Estouro
+  static const Color iosBlue = Color(0xFF007AFF); // Destaque (Royal Blue)
+  static const Color iosIndigo = Color(0xFF5856D6); // Índigo / Cartões
+  static const Color iosOrange = Color(0xFFFF9500); // Alerta 80% / Ignorados
+  static const Color iosTeal = Color(0xFF30B0C7);
+  static const Color iosAmber = Color(0xFFFFCC00);
+
+  // Tokens semânticos compatíveis com toda a aplicação
+  static const Color primary = iosGreen;
+  static const Color primaryLight = Color(0xFF30D158);
+  static const Color primarySoft = Color(0xFFE8F8ED);
+  static const Color emerald = iosGreen;
+  static const Color orange = iosOrange;
+  static const Color rose = iosRed;
+  static const Color blue = iosBlue;
+  static const Color purple = iosIndigo;
+  static const Color cyan = iosTeal;
+  static const Color amber = iosAmber;
+  static const Color indigo = iosIndigo;
 
   static const List<Color> presetPalette = [
-    Color(0xFF8B5CF6), // Roxo (Nubank style)
-    Color(0xFFF97316), // Laranja (Itaú/Inter style)
-    Color(0xFF3B82F6), // Azul
-    Color(0xFF059669), // Esmeralda
-    Color(0xFFF43F5E), // Rosa/Vermelho
-    Color(0xFF06B6D4), // Ciano
-    Color(0xFFF59E0B), // Âmbar
-    Color(0xFF475569), // Grafite/Black
+    Color(0xFF5856D6), // Índigo (iOS)
+    Color(0xFFFF9500), // Laranja (iOS)
+    Color(0xFF007AFF), // Azul Royal (iOS)
+    Color(0xFF34C759), // Verde (iOS)
+    Color(0xFFFF3B30), // Vermelho (iOS)
+    Color(0xFF30B0C7), // Ciano (iOS)
+    Color(0xFFAF52DE), // Roxo (iOS)
+    Color(0xFF636366), // Grafite (iOS)
   ];
 
-  // Contraste AA para textos semânticos
-  static const Color successStrong = Color(0xFF047857);
-  static const Color dangerStrong = Color(0xFFE11D48);
-  static const Color warningStrong = Color(0xFFC2410C);
+  // Contraste calibrado para Light e Dark OLED
+  static const Color successStrong = Color(0xFF248A3D);
+  static const Color dangerStrong = Color(0xFFD70015);
+  static const Color warningStrong = Color(0xFFC93400);
 
   static bool isDark(BuildContext c) =>
       Theme.of(c).brightness == Brightness.dark;
 
-  static Color success(BuildContext c) => isDark(c) ? emerald : successStrong;
-  static Color danger(BuildContext c) => isDark(c) ? rose : dangerStrong;
-  static Color warning(BuildContext c) => isDark(c) ? orange : warningStrong;
+  static Color background(BuildContext c) =>
+      isDark(c) ? darkBackground : lightBackground;
+  static Color surface(BuildContext c) =>
+      isDark(c) ? darkSurface : lightSurface;
+  static Color secondarySurface(BuildContext c) =>
+      isDark(c) ? darkSecondarySurface : lightSecondarySurface;
+  static Color border(BuildContext c) => isDark(c) ? darkBorder : lightBorder;
   static Color textPrimary(BuildContext c) =>
       isDark(c) ? darkTextPrimary : lightTextPrimary;
   static Color textSecondary(BuildContext c) =>
       isDark(c) ? darkTextSecondary : lightTextSecondary;
-  static Color surface(BuildContext c) =>
-      isDark(c) ? darkSurface : lightSurface;
-  static Color border(BuildContext c) => isDark(c) ? darkBorder : lightBorder;
+
+  static Color success(BuildContext c) => isDark(c) ? iosGreen : iosGreen;
+  static Color danger(BuildContext c) => isDark(c) ? iosRed : iosRed;
+  static Color warning(BuildContext c) => isDark(c) ? iosOrange : warningStrong;
+  static Color accent(BuildContext c) => iosBlue;
+}
+
+/// Espaçamentos e Raios padronizados (Apple HIG Inset Grouped)
+class AppSpacing {
+  static const double xs = 4.0;
+  static const double sm = 8.0;
+  static const double md = 12.0;
+  static const double lg = 16.0;
+  static const double xl = 20.0;
+  static const double xxl = 28.0;
+
+  static const double cardRadius = 18.0;
+  static const double heroRadius = 20.0;
+  static const double squircleRadius = 10.0;
+  static const double hairlineBorder = 0.5;
+}
+
+/// Tipografia Financeira com `FontFeature.tabularFigures()` obrigatório para números
+class AppTypography {
+  static const List<FontFeature> tabular = [FontFeature.tabularFigures()];
+
+  static TextStyle heroBalance(BuildContext context, Color color) => TextStyle(
+        fontSize: 36,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.8,
+        color: color,
+        fontFeatures: tabular,
+      );
+
+  static TextStyle metricValue(BuildContext context, {Color? color}) =>
+      TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.3,
+        color: color ?? AppColors.textPrimary(context),
+        fontFeatures: tabular,
+      );
+
+  static TextStyle listAmount(BuildContext context, Color color) => TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.3,
+        color: color,
+        fontFeatures: tabular,
+      );
+
+  static TextStyle captionTabular(BuildContext context, {Color? color}) =>
+      TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: color ?? AppColors.textSecondary(context),
+        fontFeatures: tabular,
+      );
 }
 
 /// Formatador de moeda em centavos (digitação da direita para a esquerda).
@@ -158,6 +231,86 @@ class AppFormatters {
   }
 }
 
+/// Container de ícone estilo SF Symbols em squircle com 12% de opacidade.
+class HigIconSquircle extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final double size;
+  final double iconSize;
+  final double radius;
+
+  const HigIconSquircle({
+    super.key,
+    required this.icon,
+    required this.color,
+    this.size = 34,
+    this.iconSize = 18,
+    this.radius = AppSpacing.squircleRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: Icon(
+        icon,
+        size: iconSize,
+        color: color,
+      ),
+    );
+  }
+}
+
+/// Superfície translúcida com efeito de vidro fosco (Frosted Glass iOS).
+class HigFrostedSurface extends StatelessWidget {
+  final Widget child;
+  final Border? border;
+  final BorderRadius? borderRadius;
+  final EdgeInsetsGeometry? padding;
+
+  const HigFrostedSurface({
+    super.key,
+    required this.child,
+    this.border,
+    this.borderRadius,
+    this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = AppColors.isDark(context);
+    final bgColor = isDark
+        ? AppColors.darkSurface.withValues(alpha: 0.82)
+        : AppColors.lightSurface.withValues(alpha: 0.85);
+
+    Widget content = BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: borderRadius,
+          border: border,
+        ),
+        child: child,
+      ),
+    );
+
+    if (borderRadius != null) {
+      return ClipRRect(
+        borderRadius: borderRadius!,
+        child: content,
+      );
+    }
+    return ClipRect(child: content);
+  }
+}
+
 class HigSectionHeader extends StatelessWidget {
   final String title;
   final Widget? trailing;
@@ -184,8 +337,8 @@ class HigSectionHeader extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
                 color: AppColors.textSecondary(context),
               ),
             ),
@@ -200,14 +353,18 @@ class HigSectionHeader extends StatelessWidget {
   }
 }
 
+/// Bloco agrupado estilo `CupertinoListSection.insetGrouped` sem sombras pesadas
+/// e com borda hairline de 0.5px.
 class HigGroupedCard extends StatelessWidget {
   final List<Widget> children;
   final EdgeInsetsGeometry? padding;
+  final double borderRadius;
 
   const HigGroupedCard({
     super.key,
     required this.children,
     this.padding,
+    this.borderRadius = AppSpacing.cardRadius,
   });
 
   @override
@@ -222,11 +379,12 @@ class HigGroupedCard extends StatelessWidget {
     }
     return Material(
       color: AppColors.surface(context),
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(borderRadius),
         side: BorderSide(
           color: AppColors.border(context),
-          width: 0.8,
+          width: AppSpacing.hairlineBorder,
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -260,10 +418,10 @@ class HigCurrencyHeroField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: AppColors.surface(context),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppSpacing.heroRadius),
         border: Border.all(
           color: AppColors.border(context),
-          width: 0.8,
+          width: AppSpacing.hairlineBorder,
         ),
       ),
       child: Column(
@@ -272,8 +430,8 @@ class HigCurrencyHeroField extends StatelessWidget {
             label.toUpperCase(),
             style: TextStyle(
               fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.7,
               color: AppColors.textSecondary(context),
             ),
           ),
@@ -289,6 +447,7 @@ class HigCurrencyHeroField extends StatelessWidget {
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                   color: accentColor.withValues(alpha: 0.85),
+                  fontFeatures: AppTypography.tabular,
                 ),
               ),
               const SizedBox(width: 6),
@@ -306,9 +465,10 @@ class HigCurrencyHeroField extends StatelessWidget {
                     onChanged: onChanged,
                     style: TextStyle(
                       fontSize: 38,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1.2,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.8,
                       color: accentColor,
+                      fontFeatures: AppTypography.tabular,
                     ),
                     decoration: InputDecoration(
                       border: InputBorder.none,
@@ -317,6 +477,7 @@ class HigCurrencyHeroField extends StatelessWidget {
                       hintText: '0,00',
                       hintStyle: TextStyle(
                         color: accentColor.withValues(alpha: 0.35),
+                        fontFeatures: AppTypography.tabular,
                       ),
                     ),
                   ),
@@ -360,7 +521,7 @@ class HigAnimatedProgressBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: animatedValue,
             minHeight: minHeight,
-            backgroundColor: color.withValues(alpha: 0.13),
+            backgroundColor: color.withValues(alpha: 0.12),
             valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
         );
@@ -369,7 +530,7 @@ class HigAnimatedProgressBar extends StatelessWidget {
   }
 }
 
-/// Pílula semântica à prova de overflow para destacar 'Seus gastos' vs 'Ignorados'.
+/// Pílula semântica à prova de overflow com `tabularFigures` para valores financeiros.
 class HigInfoPill extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -385,7 +546,7 @@ class HigInfoPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
@@ -402,8 +563,9 @@ class HigInfoPill extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
                 color: color,
+                fontFeatures: AppTypography.tabular,
               ),
             ),
           ),
@@ -418,14 +580,17 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       scaffoldBackgroundColor: AppColors.lightBackground,
-      primaryColor: AppColors.primary,
+      primaryColor: AppColors.iosBlue,
       colorScheme: const ColorScheme.light(
-        primary: AppColors.primary,
-        secondary: AppColors.primaryLight,
+        primary: AppColors.iosBlue,
+        secondary: AppColors.iosIndigo,
         surface: AppColors.lightSurface,
         onSurface: AppColors.lightTextPrimary,
-        error: AppColors.rose,
+        error: AppColors.iosRed,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.lightBackground,
@@ -437,19 +602,18 @@ class AppTheme {
           color: AppColors.lightTextPrimary,
           fontSize: 17,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.3,
+          letterSpacing: -0.4,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final isSelected = states.contains(WidgetState.selected);
           return TextStyle(
-            fontSize: 11.5,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             letterSpacing: -0.2,
-            color: isSelected
-                ? AppColors.primary
-                : AppColors.lightTextSecondary,
+            color:
+                isSelected ? AppColors.iosBlue : AppColors.lightTextSecondary,
           );
         }),
       ),
@@ -458,18 +622,23 @@ class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: AppColors.lightBorder, width: 0.8),
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+          side: const BorderSide(
+            color: AppColors.lightBorder,
+            width: AppSpacing.hairlineBorder,
+          ),
         ),
       ),
       dividerTheme: const DividerThemeData(
-        color: Color(0xFFF1F5F9),
-        thickness: 1,
+        color: AppColors.lightBorder,
+        thickness: AppSpacing.hairlineBorder,
         space: 1,
       ),
       cupertinoOverrideTheme: const CupertinoThemeData(
-        primaryColor: AppColors.primary,
+        primaryColor: AppColors.iosBlue,
         brightness: Brightness.light,
+        scaffoldBackgroundColor: AppColors.lightBackground,
+        barBackgroundColor: Color(0xD9F2F2F7),
       ),
     );
   }
@@ -478,14 +647,17 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       scaffoldBackgroundColor: AppColors.darkBackground,
-      primaryColor: AppColors.primaryLight,
+      primaryColor: AppColors.iosBlue,
       colorScheme: const ColorScheme.dark(
-        primary: AppColors.primaryLight,
-        secondary: AppColors.primary,
+        primary: AppColors.iosBlue,
+        secondary: AppColors.iosIndigo,
         surface: AppColors.darkSurface,
         onSurface: AppColors.darkTextPrimary,
-        error: AppColors.rose,
+        error: AppColors.iosRed,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.darkBackground,
@@ -497,19 +669,17 @@ class AppTheme {
           color: AppColors.darkTextPrimary,
           fontSize: 17,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.3,
+          letterSpacing: -0.4,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final isSelected = states.contains(WidgetState.selected);
           return TextStyle(
-            fontSize: 11.5,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             letterSpacing: -0.2,
-            color: isSelected
-                ? AppColors.primaryLight
-                : AppColors.darkTextSecondary,
+            color: isSelected ? AppColors.iosBlue : AppColors.darkTextSecondary,
           );
         }),
       ),
@@ -518,18 +688,23 @@ class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: AppColors.darkBorder, width: 0.8),
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+          side: const BorderSide(
+            color: AppColors.darkBorder,
+            width: AppSpacing.hairlineBorder,
+          ),
         ),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.darkBorder,
-        thickness: 1,
+        thickness: AppSpacing.hairlineBorder,
         space: 1,
       ),
       cupertinoOverrideTheme: const CupertinoThemeData(
-        primaryColor: AppColors.primaryLight,
+        primaryColor: AppColors.iosBlue,
         brightness: Brightness.dark,
+        scaffoldBackgroundColor: AppColors.darkBackground,
+        barBackgroundColor: Color(0xD91C1C1E),
       ),
     );
   }

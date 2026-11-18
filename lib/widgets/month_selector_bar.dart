@@ -1,3 +1,5 @@
+import 'dart:ui';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -10,7 +12,7 @@ class MonthSelectorBar extends StatelessWidget {
   const MonthSelectorBar({super.key, required this.appState});
 
   Future<void> _showMonthPicker(BuildContext context) async {
-    HapticFeedback.selectionClick();
+    HapticFeedback.lightImpact();
     final parts = appState.selectedYearMonth.split('-');
     int pickerYear = int.parse(parts[0]);
     final selectedYear = int.parse(parts[0]);
@@ -23,144 +25,198 @@ class MonthSelectorBar extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        final isDark = AppColors.isDark(ctx);
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurface : Colors.white,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: SafeArea(
-                top: false,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF475569)
-                              : const Color(0xFFCBD5E1),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
+            return ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface(context).withValues(alpha: 0.94),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(24)),
+                    border: Border(
+                      top: BorderSide(
+                        color: AppColors.border(context),
+                        width: AppSpacing.hairlineBorder,
                       ),
-                      const SizedBox(height: 14),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    ),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(
-                            tooltip: 'Ano anterior',
-                            onPressed: () {
-                              HapticFeedback.selectionClick();
-                              setModalState(() => pickerYear--);
-                            },
-                            icon: const Icon(Icons.chevron_left_rounded),
-                          ),
-                          Text(
-                            '$pickerYear',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary(context),
+                          Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: AppColors.textSecondary(context)
+                                  .withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(100),
                             ),
                           ),
-                          IconButton(
-                            tooltip: 'Próximo ano',
-                            onPressed: () {
-                              HapticFeedback.selectionClick();
-                              setModalState(() => pickerYear++);
-                            },
-                            icon: const Icon(Icons.chevron_right_rounded),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: 12,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 2.1,
-                        ),
-                        itemBuilder: (context, idx) {
-                          final month = idx + 1;
-                          final labelRaw = DateFormat('MMM', 'pt_BR')
-                              .format(DateTime(pickerYear, month, 1));
-                          final label = labelRaw[0].toUpperCase() +
-                              labelRaw.substring(1).replaceAll('.', '');
-                          final isSelected = pickerYear == selectedYear &&
-                              month == selectedMonth;
-                          final isToday =
-                              pickerYear == now.year && month == now.month;
-
-                          return Material(
-                            color: isSelected
-                                ? AppColors.primary
-                                : (isDark
-                                    ? AppColors.darkBackground
-                                    : const Color(0xFFF1F5F9)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              side: isToday && !isSelected
-                                  ? const BorderSide(
-                                      color: AppColors.primary,
-                                      width: 1.2,
-                                    )
-                                  : BorderSide.none,
-                            ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(10),
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                final ym =
-                                    '$pickerYear-${month.toString().padLeft(2, '0')}';
-                                appState.setSelectedYearMonth(ym);
-                                Navigator.of(ctx).pop();
-                              },
-                              child: Center(
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : AppColors.textPrimary(context),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Tooltip(
+                                message: 'Ano anterior',
+                                child: GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    setModalState(() => pickerYear--);
+                                  },
+                                  behavior: HitTestBehavior.opaque,
+                                  child: const HigIconSquircle(
+                                    icon: CupertinoIcons.chevron_left,
+                                    color: AppColors.iosBlue,
+                                    size: 36,
+                                    iconSize: 17,
+                                    radius: 10,
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                      if (appState.selectedYearMonth != currentYm) ...[
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: TextButton.icon(
-                            onPressed: () {
-                              HapticFeedback.selectionClick();
-                              appState.setSelectedYearMonth(currentYm);
-                              Navigator.of(ctx).pop();
-                            },
-                            icon: const Icon(Icons.today_rounded, size: 18),
-                            label: const Text(
-                              'Ir para o mês atual',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
+                              Text(
+                                '$pickerYear',
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.4,
+                                  color: AppColors.textPrimary(context),
+                                  fontFeatures: AppTypography.tabular,
+                                ),
+                              ),
+                              Tooltip(
+                                message: 'Próximo ano',
+                                child: GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    setModalState(() => pickerYear++);
+                                  },
+                                  behavior: HitTestBehavior.opaque,
+                                  child: const HigIconSquircle(
+                                    icon: CupertinoIcons.chevron_right,
+                                    color: AppColors.iosBlue,
+                                    size: 36,
+                                    iconSize: 17,
+                                    radius: 10,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ],
+                          const SizedBox(height: 14),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: 12,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                              childAspectRatio: 2.1,
+                            ),
+                            itemBuilder: (context, idx) {
+                              final month = idx + 1;
+                              final labelRaw = DateFormat('MMM', 'pt_BR')
+                                  .format(DateTime(pickerYear, month, 1));
+                              final label = labelRaw[0].toUpperCase() +
+                                  labelRaw.substring(1).replaceAll('.', '');
+                              final isSelected = pickerYear == selectedYear &&
+                                  month == selectedMonth;
+                              final isToday =
+                                  pickerYear == now.year && month == now.month;
+
+                              return GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  final ym =
+                                      '$pickerYear-${month.toString().padLeft(2, '0')}';
+                                  appState.setSelectedYearMonth(ym);
+                                  Navigator.of(ctx).pop();
+                                },
+                                behavior: HitTestBehavior.opaque,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 140),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.iosBlue
+                                        : AppColors.secondarySurface(context),
+                                    borderRadius: BorderRadius.circular(11),
+                                    border: isToday && !isSelected
+                                        ? Border.all(
+                                            color: AppColors.iosBlue,
+                                            width: 1.2,
+                                          )
+                                        : Border.all(
+                                            color: AppColors.border(context),
+                                            width: AppSpacing.hairlineBorder,
+                                          ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      label,
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w600,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : AppColors.textPrimary(context),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          if (appState.selectedYearMonth != currentYm) ...[
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 46,
+                              child: CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                color:
+                                    AppColors.iosBlue.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(13),
+                                onPressed: () {
+                                  HapticFeedback.lightImpact();
+                                  appState.setSelectedYearMonth(currentYm);
+                                  Navigator.of(ctx).pop();
+                                },
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      CupertinoIcons.calendar_today,
+                                      size: 17,
+                                      color: AppColors.iosBlue,
+                                    ),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Ir para o mês atual',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.iosBlue,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -175,60 +231,61 @@ class MonthSelectorBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final formattedMonth = AppFormatters.monthLabel(appState.selectedYearMonth);
 
-    return Material(
-      color: AppColors.surface(context),
-      shape: RoundedRectangleBorder(
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppColors.surface(context),
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
+        border: Border.all(
           color: AppColors.border(context),
-          width: 0.8,
+          width: AppSpacing.hairlineBorder,
         ),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Semantics(
             button: true,
             label: 'Mês anterior',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
+            child: GestureDetector(
               onTap: () {
-                HapticFeedback.selectionClick();
+                HapticFeedback.lightImpact();
                 appState.changeMonth(-1);
               },
-              child: const SizedBox(
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
                 width: 44,
                 height: 44,
-                child: Icon(Icons.chevron_left_rounded, size: 22),
+                child: Icon(
+                  CupertinoIcons.chevron_left,
+                  size: 17,
+                  color: AppColors.textSecondary(context),
+                ),
               ),
             ),
           ),
-          Flexible(
+          Expanded(
             child: Semantics(
               button: true,
               label: 'Mês selecionado: $formattedMonth. Toque para escolher',
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
+              child: GestureDetector(
                 onTap: () => _showMonthPicker(context),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Center(
-                      widthFactor: 1.0,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: Text(
-                          formattedMonth,
-                          key: ValueKey<String>(appState.selectedYearMonth),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.2,
-                            color: AppColors.textPrimary(context),
-                          ),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: Text(
+                        formattedMonth,
+                        key: ValueKey<String>(appState.selectedYearMonth),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
+                          color: AppColors.textPrimary(context),
+                          fontFeatures: AppTypography.tabular,
                         ),
                       ),
                     ),
@@ -240,16 +297,20 @@ class MonthSelectorBar extends StatelessWidget {
           Semantics(
             button: true,
             label: 'Próximo mês',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
+            child: GestureDetector(
               onTap: () {
-                HapticFeedback.selectionClick();
+                HapticFeedback.lightImpact();
                 appState.changeMonth(1);
               },
-              child: const SizedBox(
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
                 width: 44,
                 height: 44,
-                child: Icon(Icons.chevron_right_rounded, size: 22),
+                child: Icon(
+                  CupertinoIcons.chevron_right,
+                  size: 17,
+                  color: AppColors.textSecondary(context),
+                ),
               ),
             ),
           ),

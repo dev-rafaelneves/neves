@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/models.dart';
@@ -25,276 +26,95 @@ class SummaryTab extends StatelessWidget {
     final cards = appState.cards;
     final catBreakdown = appState.expensesByCategory(ym);
 
-    final isPositive = balance >= 0;
-    final balanceColor =
-        isPositive ? AppColors.success(context) : AppColors.danger(context);
-
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        120,
+      ),
       children: [
-        // Card Principal: Quanto Sobra no Mês + Matemática Transparente
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surface(context),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: AppColors.border(context),
-              width: 0.8,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Text(
-                      'QUANTO SOBRA NO MÊS',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: AppColors.textSecondary(context),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: balanceColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Text(
-                      isPositive ? 'No azul' : 'No vermelho',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: balanceColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // Hero Value com FittedBox e AnimatedSwitcher para zero overflow e fluidez
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  child: Text(
-                    AppFormatters.currency(balance, discreet: discreet),
-                    key: ValueKey<String>('${ym}_${discreet}_$balance'),
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1.0,
-                      color: balanceColor,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Entradas menos saídas de ${AppFormatters.monthLabel(ym, short: true)} (exclui itens ignorados)',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: AppColors.textSecondary(context),
-                ),
-              ),
-              const SizedBox(height: 18),
-              const Divider(height: 1),
-              const SizedBox(height: 14),
-
-              // Linha 1: Entradas vs Total de Saídas
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetricTile(
-                      label: 'Entradas',
-                      value: AppFormatters.currency(income, discreet: discreet),
-                      icon: Icons.arrow_downward_rounded,
-                      color: AppColors.success(context),
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        appState.setActiveTab(1, filter: 'income');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _MetricTile(
-                      label: 'Total de Saídas',
-                      value: AppFormatters.currency(
-                        totalExpense,
-                        discreet: discreet,
-                      ),
-                      icon: Icons.arrow_upward_rounded,
-                      color: AppColors.danger(context),
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        appState.setActiveTab(1, filter: null);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Linha 2: Composição das Saídas (Conta Corrente vs Faturas do Mês)
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetricTile(
-                      label: 'Conta Corrente',
-                      value: AppFormatters.currency(
-                        cashExpense,
-                        discreet: discreet,
-                      ),
-                      icon: Icons.account_balance_rounded,
-                      color: AppColors.blue,
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        appState.setActiveTab(1, filter: 'cash');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _MetricTile(
-                      label: 'Faturas de Cartão',
-                      value: AppFormatters.currency(
-                        cardExpense,
-                        discreet: discreet,
-                      ),
-                      icon: Icons.credit_card_rounded,
-                      color: AppColors.purple,
-                      onTap: cards.isNotEmpty
-                          ? () {
-                              HapticFeedback.selectionClick();
-                              appState.setActiveTab(
-                                1,
-                                filter: 'card:${cards.first.id}',
-                              );
-                            }
-                          : null,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+        // 1. Hero Header: Quanto Sobra no Mês + Composição 2x2 estilo Copilot Money / Apple Wallet
+        _BalanceHeader(
+          yearMonth: ym,
+          balance: balance,
+          income: income,
+          totalExpense: totalExpense,
+          cashExpense: cashExpense,
+          cardExpense: cardExpense,
+          discreet: discreet,
+          onTapIncome: () {
+            HapticFeedback.lightImpact();
+            appState.setActiveTab(1, filter: 'income');
+          },
+          onTapTotalExpense: () {
+            HapticFeedback.lightImpact();
+            appState.setActiveTab(1, filter: null);
+          },
+          onTapCashExpense: () {
+            HapticFeedback.lightImpact();
+            appState.setActiveTab(1, filter: 'cash');
+          },
+          onTapCardExpense: cards.isNotEmpty
+              ? () {
+                  HapticFeedback.lightImpact();
+                  appState.setActiveTab(1, filter: 'card:${cards.first.id}');
+                }
+              : null,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.lg),
 
-        // Ações Rápidas (Ergonomia 48dp + FittedBox contra quebra em 360dp)
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.rose,
-                  minimumSize: const Size.fromHeight(48),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () => TransactionFormSheet.show(
-                  context,
-                  appState: appState,
-                  initialType: TransactionType.expense,
-                ),
-                icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
-                label: const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'Gasto',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  minimumSize: const Size.fromHeight(48),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () => TransactionFormSheet.show(
-                  context,
-                  appState: appState,
-                  initialType: TransactionType.income,
-                ),
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-                label: const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'Receita',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () => UnifiedImportScreen.open(
-                  context,
-                  appState: appState,
-                ),
-                icon: const Icon(Icons.upload_file_rounded, size: 18),
-                label: const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'Importar',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ),
-          ],
+        // 2. Ações Rápidas Minimalistas (Gasto, Receita, Importar)
+        _QuickActionsBar(
+          onNewExpense: () {
+            HapticFeedback.lightImpact();
+            TransactionFormSheet.show(
+              context,
+              appState: appState,
+              initialType: TransactionType.expense,
+            );
+          },
+          onNewIncome: () {
+            HapticFeedback.lightImpact();
+            TransactionFormSheet.show(
+              context,
+              appState: appState,
+              initialType: TransactionType.income,
+            );
+          },
+          onImport: () {
+            HapticFeedback.lightImpact();
+            UnifiedImportScreen.open(
+              context,
+              appState: appState,
+            );
+          },
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: AppSpacing.xxl),
 
-        // Faturas de Cartão de Crédito do Mês
+        // 3. Faturas de Cartão de Crédito do Mês (Inset Grouped)
         HigSectionHeader(
           title: 'Faturas do Mês',
-          trailing: TextButton(
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-            ),
-            onPressed: () => appState.setActiveTab(2),
+          trailing: CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            minimumSize: Size.zero,
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              appState.setActiveTab(2);
+            },
             child: const Text(
               'Gerenciar Cartões',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.iosBlue,
+              ),
             ),
           ),
         ),
         if (cards.isEmpty)
           HigGroupedCard(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             children: [
               Text(
                 'Nenhum cartão cadastrado.',
@@ -309,7 +129,13 @@ class SummaryTab extends StatelessWidget {
           HigGroupedCard(
             children: [
               for (int i = 0; i < cards.length; i++) ...[
-                if (i > 0) const Divider(height: 1),
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    thickness: AppSpacing.hairlineBorder,
+                    indent: 58,
+                    color: AppColors.border(context),
+                  ),
                 _CardInvoiceRow(
                   card: cards[i],
                   invoiceTotal: appState.cardInvoiceTotal(cards[i].id, ym),
@@ -323,27 +149,32 @@ class SummaryTab extends StatelessWidget {
                   itemCount: appState.cardInvoiceCount(cards[i].id, ym),
                   discreet: discreet,
                   onTap: () {
-                    HapticFeedback.selectionClick();
+                    HapticFeedback.lightImpact();
                     appState.setActiveTab(1, filter: 'card:${cards[i].id}');
                   },
                 ),
               ],
             ],
           ),
-        const SizedBox(height: 22),
+        const SizedBox(height: AppSpacing.xxl),
 
-        // Gastos por Categoria & Tetos Mensais
+        // 4. Gastos por Categoria & Tetos Mensais (Inset Grouped)
         HigSectionHeader(
           title: 'Gastos por Categoria & Tetos',
-          trailing: TextButton(
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-            ),
-            onPressed: () => _showQuickBudgetListModal(context, appState),
+          trailing: CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            minimumSize: Size.zero,
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              appState.setActiveTab(3);
+            },
             child: const Text(
               'Definir Tetos',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.iosBlue,
+              ),
             ),
           ),
         ),
@@ -353,20 +184,22 @@ class SummaryTab extends StatelessWidget {
             totalPlanned: appState.totalPlannedCategoryBudget(),
             discreet: discreet,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.md),
         ],
         if (catBreakdown.isEmpty)
           HigGroupedCard(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
             children: [
               Column(
                 children: [
-                  Icon(
-                    Icons.pie_chart_outline_rounded,
-                    size: 36,
-                    color: AppColors.textSecondary(context),
+                  const HigIconSquircle(
+                    icon: CupertinoIcons.chart_pie_fill,
+                    color: AppColors.iosBlue,
+                    size: 44,
+                    iconSize: 22,
+                    radius: 13,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Text(
                     'Nenhuma despesa ou teto registrado neste mês.',
                     textAlign: TextAlign.center,
@@ -375,12 +208,26 @@ class SummaryTab extends StatelessWidget {
                       color: AppColors.textSecondary(context),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    onPressed: () =>
-                        _showQuickBudgetListModal(context, appState),
-                    icon: const Icon(Icons.tune_rounded, size: 17),
-                    label: const Text('Definir Teto de Categoria'),
+                  const SizedBox(height: 12),
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    color: AppColors.iosBlue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      appState.setActiveTab(3);
+                    },
+                    child: const Text(
+                      'Definir Teto de Categoria',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.iosBlue,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -390,15 +237,20 @@ class SummaryTab extends StatelessWidget {
           HigGroupedCard(
             children: [
               for (int i = 0; i < catBreakdown.length; i++) ...[
-                if (i > 0) const Divider(height: 1),
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    thickness: AppSpacing.hairlineBorder,
+                    indent: 58,
+                    color: AppColors.border(context),
+                  ),
                 _CategorySummaryRow(
                   item: catBreakdown[i],
                   discreet: discreet,
-                  onTap: () => _CategoryBudgetAndDetailsSheet.show(
-                    context,
-                    appState: appState,
-                    category: catBreakdown[i].category,
-                  ),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    appState.setActiveTab(3);
+                  },
                 ),
               ],
             ],
@@ -406,112 +258,187 @@ class SummaryTab extends StatelessWidget {
       ],
     );
   }
+}
 
-  static Future<void> _showQuickBudgetListModal(
-    BuildContext context,
-    AppState appState,
-  ) async {
-    HapticFeedback.selectionClick();
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return ListenableBuilder(
-          listenable: appState,
-          builder: (context, _) {
-            final expCats =
-                appState.categoriesByType(TransactionType.expense);
-            return Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.82,
-              ),
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-              decoration: BoxDecoration(
-                color: AppColors.surface(context),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Tetos Mensais por Categoria',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Toque em uma categoria para definir ou alterar seu limite mensal',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: AppColors.textSecondary(context),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: expCats.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, i) {
-                          final cat = expCats[i];
-                          return ListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 4),
-                            onTap: () => _CategoryBudgetAndDetailsSheet.show(
-                              context,
-                              appState: appState,
-                              category: cat,
-                            ),
-                            leading: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: cat.color.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(
-                                cat.icon,
-                                color: cat.color,
-                                size: 19,
-                              ),
-                            ),
-                            title: Text(
-                              cat.name,
-                              style: const TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            trailing: Text(
-                              cat.hasBudget
-                                  ? AppFormatters.currency(cat.monthlyBudget)
-                                  : 'Sem teto →',
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
-                                color: cat.hasBudget
-                                    ? AppColors.primary
-                                    : AppColors.textSecondary(context),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+/// 1. Cabeçalho Hero do Saldo Líquido + Matriz 2x2 de Composição Mensal
+class _BalanceHeader extends StatelessWidget {
+  final String yearMonth;
+  final double balance;
+  final double income;
+  final double totalExpense;
+  final double cashExpense;
+  final double cardExpense;
+  final bool discreet;
+  final VoidCallback onTapIncome;
+  final VoidCallback onTapTotalExpense;
+  final VoidCallback onTapCashExpense;
+  final VoidCallback? onTapCardExpense;
+
+  const _BalanceHeader({
+    required this.yearMonth,
+    required this.balance,
+    required this.income,
+    required this.totalExpense,
+    required this.cashExpense,
+    required this.cardExpense,
+    required this.discreet,
+    required this.onTapIncome,
+    required this.onTapTotalExpense,
+    required this.onTapCashExpense,
+    required this.onTapCardExpense,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPositive = balance >= 0;
+    final balanceColor =
+        isPositive ? AppColors.success(context) : AppColors.danger(context);
+
+    return HigGroupedCard(
+      borderRadius: AppSpacing.heroRadius,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                'QUANTO SOBRA NO MÊS',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.7,
+                  color: AppColors.textSecondary(context),
                 ),
               ),
-            );
-          },
-        );
-      },
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: balanceColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isPositive
+                        ? CupertinoIcons.checkmark_alt_circle_fill
+                        : CupertinoIcons.exclamationmark_circle_fill,
+                    size: 13,
+                    color: balanceColor,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isPositive ? 'No azul' : 'No vermelho',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: balanceColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+
+        // Valor do saldo principal em destaque absoluto com tabularFigures
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: Text(
+              AppFormatters.currency(balance, discreet: discreet),
+              key: ValueKey<String>('${yearMonth}_${discreet}_$balance'),
+              style: AppTypography.heroBalance(context, balanceColor),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Entradas menos saídas de ${AppFormatters.monthLabel(yearMonth, short: true)} (exclui itens ignorados)',
+          style: TextStyle(
+            fontSize: 12.5,
+            color: AppColors.textSecondary(context),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Divider(
+          height: 1,
+          thickness: AppSpacing.hairlineBorder,
+          color: AppColors.border(context),
+        ),
+        const SizedBox(height: 16),
+
+        // Linha 1: Entradas vs Total de Saídas
+        Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                label: 'Entradas',
+                value: AppFormatters.currency(income, discreet: discreet),
+                icon: CupertinoIcons.arrow_down_left,
+                color: AppColors.iosGreen,
+                onTap: onTapIncome,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _MetricTile(
+                label: 'Total de Saídas',
+                value: AppFormatters.currency(
+                  totalExpense,
+                  discreet: discreet,
+                ),
+                icon: CupertinoIcons.arrow_up_right,
+                color: AppColors.iosRed,
+                onTap: onTapTotalExpense,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // Linha 2: Composição das Saídas (Conta Corrente vs Faturas de Cartão)
+        Row(
+          children: [
+            Expanded(
+              child: _MetricTile(
+                label: 'Conta Corrente',
+                value: AppFormatters.currency(
+                  cashExpense,
+                  discreet: discreet,
+                ),
+                icon: CupertinoIcons.building_2_fill,
+                color: AppColors.iosBlue,
+                onTap: onTapCashExpense,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _MetricTile(
+                label: 'Faturas de Cartão',
+                value: AppFormatters.currency(
+                  cardExpense,
+                  discreet: discreet,
+                ),
+                icon: CupertinoIcons.creditcard_fill,
+                color: AppColors.iosIndigo,
+                onTap: onTapCardExpense,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -534,29 +461,29 @@ class _MetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = AppColors.isDark(context);
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
+    return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
+          color: isDark
+              ? AppColors.darkSecondarySurface.withValues(alpha: 0.45)
+              : AppColors.lightBackground,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: AppColors.border(context),
-            width: 0.7,
+            width: AppSpacing.hairlineBorder,
           ),
         ),
         child: Row(
           children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 16, color: color),
+            HigIconSquircle(
+              icon: icon,
+              color: color,
+              size: 32,
+              iconSize: 16,
+              radius: 9,
             ),
             const SizedBox(width: 9),
             Expanded(
@@ -569,7 +496,7 @@ class _MetricTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                       color: AppColors.textSecondary(context),
                     ),
                   ),
@@ -578,11 +505,7 @@ class _MetricTile extends StatelessWidget {
                     value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary(context),
-                    ),
+                    style: AppTypography.metricValue(context),
                   ),
                 ],
               ),
@@ -594,6 +517,114 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
+/// 2. Barra de Ações Rápidas estilo Apple Wallet / Revolut
+class _QuickActionsBar extends StatelessWidget {
+  final VoidCallback onNewExpense;
+  final VoidCallback onNewIncome;
+  final VoidCallback onImport;
+
+  const _QuickActionsBar({
+    required this.onNewExpense,
+    required this.onNewIncome,
+    required this.onImport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickActionPillButton(
+            label: 'Gasto',
+            icon: CupertinoIcons.minus_circle_fill,
+            color: AppColors.iosRed,
+            onTap: onNewExpense,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _QuickActionPillButton(
+            label: 'Receita',
+            icon: CupertinoIcons.plus_circle_fill,
+            color: AppColors.iosGreen,
+            onTap: onNewIncome,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _QuickActionPillButton(
+            label: 'Importar',
+            icon: CupertinoIcons.tray_arrow_down_fill,
+            color: AppColors.iosBlue,
+            onTap: onImport,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionPillButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickActionPillButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface(context),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.border(context),
+            width: AppSpacing.hairlineBorder,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            HigIconSquircle(
+              icon: icon,
+              color: color,
+              size: 28,
+              iconSize: 15,
+              radius: 8,
+            ),
+            const SizedBox(width: 7),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary(context),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 3. Linha de Fatura de Cartão de Crédito estilo Apple Wallet
 class _CardInvoiceRow extends StatelessWidget {
   final CreditCardItem card;
   final double invoiceTotal;
@@ -624,28 +655,28 @@ class _CardInvoiceRow extends StatelessWidget {
     final hasIgnored = ignoredTotal.abs() > 0.005;
     final hasPaid = paidTotal > 0.005;
 
-    return InkWell(
+    final amountColor = isPaid
+        ? AppColors.success(context)
+        : (remainingTotal > 0
+            ? AppColors.danger(context)
+            : AppColors.textSecondary(context));
+
+    return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Linha 1: Ícone + Nome do Cartão à esquerda | Valor Atual a Pagar à direita
             Row(
               children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: card.color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.credit_card_rounded,
-                    color: card.color,
-                    size: 18,
-                  ),
+                HigIconSquircle(
+                  icon: CupertinoIcons.creditcard_fill,
+                  color: card.color,
+                  size: 36,
+                  iconSize: 18,
+                  radius: 10,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -655,7 +686,8 @@ class _CardInvoiceRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 15.5,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
                       color: AppColors.textPrimary(context),
                     ),
                   ),
@@ -668,23 +700,13 @@ class _CardInvoiceRow extends StatelessWidget {
                           remainingTotal,
                           discreet: discreet,
                         ),
-                  style: TextStyle(
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w800,
-                    color: isPaid
-                        ? AppColors.success(context)
-                        : (remainingTotal > 0
-                            ? AppColors.danger(context)
-                            : AppColors.textSecondary(context)),
-                  ),
+                  style: AppTypography.listAmount(context, amountColor),
                 ),
               ],
             ),
             const SizedBox(height: 6),
-
-            // Linha 2: Vencimento + Quantidade de compras à esquerda | Ver fatura à direita
             Padding(
-              padding: const EdgeInsets.only(left: 44),
+              padding: const EdgeInsets.only(left: 46),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -693,42 +715,49 @@ class _CardInvoiceRow extends StatelessWidget {
                       'Vence dia ${card.dueDay} • $itemCount ${itemCount == 1 ? 'compra' : 'compras'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: AppColors.textSecondary(context),
-                      ),
+                      style: AppTypography.captionTabular(context),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    'Ver fatura →',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: card.color,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Ver fatura',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: card.color,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 12,
+                        color: card.color,
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-
             if (hasPaid || hasIgnored) ...[
               const SizedBox(height: 8),
               Padding(
-                padding: const EdgeInsets.only(left: 44),
+                padding: const EdgeInsets.only(left: 46),
                 child: Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: [
                     if (hasPaid) ...[
                       HigInfoPill(
-                        icon: Icons.shopping_bag_outlined,
+                        icon: CupertinoIcons.bag_fill,
                         text:
                             'Compras: ${AppFormatters.currency(invoiceTotal, discreet: discreet)}',
                         color: AppColors.textSecondary(context),
                       ),
                       HigInfoPill(
-                        icon: Icons.check_circle_outline_rounded,
+                        icon: CupertinoIcons.checkmark_circle_fill,
                         text:
                             'Pago/Antecipado: ${AppFormatters.currency(paidTotal, discreet: discreet)}',
                         color: AppColors.success(context),
@@ -736,16 +765,16 @@ class _CardInvoiceRow extends StatelessWidget {
                     ],
                     if (hasIgnored) ...[
                       HigInfoPill(
-                        icon: Icons.person_outline_rounded,
+                        icon: CupertinoIcons.person_fill,
                         text:
                             'Seus gastos: ${AppFormatters.currency(ownTotal, discreet: discreet)}',
-                        color: AppColors.primary,
+                        color: AppColors.iosGreen,
                       ),
                       HigInfoPill(
-                        icon: Icons.visibility_off_outlined,
+                        icon: CupertinoIcons.eye_slash_fill,
                         text:
                             'Ignorados: ${AppFormatters.currency(ignoredTotal, discreet: discreet)}',
-                        color: AppColors.orange,
+                        color: AppColors.iosOrange,
                       ),
                     ],
                   ],
@@ -759,6 +788,7 @@ class _CardInvoiceRow extends StatelessWidget {
   }
 }
 
+/// 4. Resumo Geral dos Tetos Planejados
 class _PlannedBudgetBanner extends StatelessWidget {
   final double spentInBudgeted;
   final double totalPlanned;
@@ -783,69 +813,62 @@ class _PlannedBudgetBanner extends StatelessWidget {
         ? AppColors.danger(context)
         : (isWarn ? AppColors.warning(context) : AppColors.success(context));
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface(context),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.border(context),
-          width: 0.8,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  'Total nas Categorias com Teto',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary(context),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${AppFormatters.currency(spentInBudgeted, discreet: discreet)} / ${AppFormatters.currency(totalPlanned, discreet: discreet)}',
+    return HigGroupedCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                'Total nas Categorias com Teto',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary(context),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary(context),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          HigAnimatedProgressBar(
-            value: ratio,
-            color: statusColor,
-          ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              isOver
-                  ? 'Acima do planejado em ${AppFormatters.currency(diff.abs(), discreet: discreet)}'
-                  : 'Disponível nos tetos: ${AppFormatters.currency(diff, discreet: discreet)}',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: statusColor,
               ),
             ),
+            const SizedBox(width: 8),
+            Text(
+              '${AppFormatters.currency(spentInBudgeted, discreet: discreet)} / ${AppFormatters.currency(totalPlanned, discreet: discreet)}',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary(context),
+                fontFeatures: AppTypography.tabular,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        HigAnimatedProgressBar(
+          value: ratio,
+          color: statusColor,
+        ),
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            isOver
+                ? 'Acima do planejado em ${AppFormatters.currency(diff.abs(), discreet: discreet)}'
+                : 'Disponível nos tetos: ${AppFormatters.currency(diff, discreet: discreet)}',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: statusColor,
+              fontFeatures: AppTypography.tabular,
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
+/// 5. Linha de Categoria & Barra de Teto estilo Copilot Money
 class _CategorySummaryRow extends StatelessWidget {
   final CategoryExpenseSummary item;
   final bool discreet;
@@ -885,26 +908,21 @@ class _CategorySummaryRow extends StatelessWidget {
           '${item.count} ${item.count == 1 ? 'lançamento' : 'lançamentos'} • $pctOfExpenses% das saídas • Definir teto';
     }
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         child: Column(
           children: [
             Row(
               children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: item.category.color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Icon(
-                    item.category.icon,
-                    color: item.category.color,
-                    size: 18,
-                  ),
+                HigIconSquircle(
+                  icon: item.category.icon,
+                  color: item.category.color,
+                  size: 36,
+                  iconSize: 18,
+                  radius: 10,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -914,7 +932,7 @@ class _CategorySummaryRow extends StatelessWidget {
                       Text(
                         item.category.name,
                         style: TextStyle(
-                          fontSize: 14.5,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary(context),
                         ),
@@ -925,10 +943,11 @@ class _CategorySummaryRow extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight:
-                              hasBudget ? FontWeight.w700 : FontWeight.w500,
+                              hasBudget ? FontWeight.w600 : FontWeight.w500,
                           color: hasBudget
                               ? barColor
                               : AppColors.textSecondary(context),
+                          fontFeatures: AppTypography.tabular,
                         ),
                       ),
                     ],
@@ -941,11 +960,12 @@ class _CategorySummaryRow extends StatelessWidget {
                     Text(
                       AppFormatters.currency(item.amount, discreet: discreet),
                       style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                         color: hasBudget && item.isOverBudget
                             ? AppColors.danger(context)
                             : AppColors.textPrimary(context),
+                        fontFeatures: AppTypography.tabular,
                       ),
                     ),
                     if (hasBudget)
@@ -953,8 +973,9 @@ class _CategorySummaryRow extends StatelessWidget {
                         'de ${AppFormatters.currency(item.budget, discreet: discreet)}',
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
                           color: AppColors.textSecondary(context),
+                          fontFeatures: AppTypography.tabular,
                         ),
                       ),
                   ],
@@ -967,223 +988,6 @@ class _CategorySummaryRow extends StatelessWidget {
               color: barColor,
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryBudgetAndDetailsSheet extends StatefulWidget {
-  final AppState appState;
-  final CategoryItem category;
-
-  const _CategoryBudgetAndDetailsSheet({
-    required this.appState,
-    required this.category,
-  });
-
-  static Future<void> show(
-    BuildContext context, {
-    required AppState appState,
-    required CategoryItem category,
-  }) {
-    HapticFeedback.selectionClick();
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _CategoryBudgetAndDetailsSheet(
-        appState: appState,
-        category: category,
-      ),
-    );
-  }
-
-  @override
-  State<_CategoryBudgetAndDetailsSheet> createState() =>
-      _CategoryBudgetAndDetailsSheetState();
-}
-
-class _CategoryBudgetAndDetailsSheetState
-    extends State<_CategoryBudgetAndDetailsSheet> {
-  late final TextEditingController _budgetCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    final currentCat = widget.appState.categoryById(widget.category.id);
-    _budgetCtrl = TextEditingController(
-      text: currentCat.hasBudget
-          ? CentavosCurrencyFormatter.formatDouble(currentCat.monthlyBudget)
-          : '',
-    );
-  }
-
-  @override
-  void dispose() {
-    _budgetCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _saveBudget() async {
-    final val = CentavosCurrencyFormatter.parseValue(_budgetCtrl.text);
-    await widget.appState.updateCategoryBudget(widget.category.id, val);
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  Future<void> _clearBudget() async {
-    await widget.appState.updateCategoryBudget(widget.category.id, 0.0);
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final inset = MediaQuery.of(context).viewInsets.bottom;
-    final ym = widget.appState.selectedYearMonth;
-    final currentCat = widget.appState.categoryById(widget.category.id);
-    final txs =
-        widget.appState.transactionsForCategoryInMonth(currentCat.id, ym);
-
-    double totalSpent = 0.0;
-    for (final t in txs) {
-      totalSpent += t.amount;
-    }
-
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
-      ),
-      padding: EdgeInsets.fromLTRB(18, 14, 18, 20 + inset),
-      decoration: BoxDecoration(
-        color: AppColors.surface(context),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: currentCat.color.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      currentCat.icon,
-                      color: currentCat.color,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          currentCat.name,
-                          style: const TextStyle(
-                            fontSize: 16.5,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          'Gasto em ${AppFormatters.monthLabel(ym, short: true)}: ${AppFormatters.currency(totalSpent)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (currentCat.hasBudget)
-                    TextButton(
-                      onPressed: _clearBudget,
-                      child: Text(
-                        'Remover teto',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: AppColors.danger(context),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Campo Hero de Teto Mensal
-              HigCurrencyHeroField(
-                controller: _budgetCtrl,
-                label: 'Teto Mensal da Categoria (Opcional)',
-                accentColor: currentCat.color,
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 46,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: _saveBudget,
-                  child: const Text(
-                    'Salvar Teto Mensal',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-
-              if (txs.isNotEmpty) ...[
-                const SizedBox(height: 18),
-                HigSectionHeader(
-                  title: 'Lançamentos do Mês (${txs.length})',
-                ),
-                for (final tx in txs)
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                    dense: true,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      TransactionFormSheet.show(
-                        context,
-                        appState: widget.appState,
-                        existing: tx,
-                      );
-                    },
-                    title: Text(
-                      tx.title,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    subtitle: Text(
-                      '${AppFormatters.shortDate(tx.date)} • ${tx.paymentMethod == PaymentMethod.creditCard ? (widget.appState.cardById(tx.cardId)?.name ?? 'Cartão') : 'Conta Corrente'}',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: AppColors.textSecondary(context),
-                      ),
-                    ),
-                    trailing: Text(
-                      AppFormatters.currency(tx.amount),
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.danger(context),
-                      ),
-                    ),
-                  ),
-              ],
-            ],
-          ),
         ),
       ),
     );

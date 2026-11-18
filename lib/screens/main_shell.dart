@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/app_state.dart';
@@ -57,113 +58,122 @@ class MainShell extends StatelessWidget {
     }
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Cabeçalho em 2 linhas elástico (à prova de overflow em qualquer TextScaler)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Linha 1: Ícone + Marca
-                  Row(
-                    children: [
-                      const NevesAppIcon(size: 28),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          'Neves Finanças',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.4,
-                            color: AppColors.textPrimary(context),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Linha 2: Seletor de Mês à esquerda | Ações táteis (44x44dp) à direita
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: MonthSelectorBar(appState: appState),
-                      ),
-                      const SizedBox(width: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _HeaderActionButton(
-                            tooltip: 'Importar Extrato / Fatura',
-                            icon: Icons.upload_file_rounded,
-                            onTap: () => UnifiedImportScreen.open(
-                              context,
-                              appState: appState,
+      extendBody: true,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Barra superior translúcida com vidro fosco (Frosted Glass Apple HIG)
+          HigFrostedSurface(
+            border: Border(
+              bottom: BorderSide(
+                color: AppColors.border(context),
+                width: AppSpacing.hairlineBorder,
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Linha 1: Ícone + Large Title expressivo
+                    Row(
+                      children: [
+                        const NevesAppIcon(size: 26),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Neves Finanças',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.6,
+                              color: AppColors.textPrimary(context),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          _HeaderActionButton(
-                            tooltip: appState.discreetMode
-                                ? 'Mostrar valores'
-                                : 'Ocultar valores',
-                            icon: appState.discreetMode
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            isActive: appState.discreetMode,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              appState.toggleDiscreetMode();
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
 
-            // Conteúdo da aba ativa com transição suave
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 160),
-                child: activeTabBody,
+                    // Linha 2: Seletor de Mês esticado da esquerda até encostar nos ícones à direita
+                    Row(
+                      children: [
+                        Expanded(
+                          child: MonthSelectorBar(appState: appState),
+                        ),
+                        const SizedBox(width: 8),
+                        _HeaderActionButton(
+                          tooltip: 'Importar Extrato / Fatura',
+                          icon: CupertinoIcons.tray_arrow_down,
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            UnifiedImportScreen.open(
+                              context,
+                              appState: appState,
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _HeaderActionButton(
+                          tooltip: appState.discreetMode
+                              ? 'Mostrar valores'
+                              : 'Ocultar valores',
+                          icon: appState.discreetMode
+                              ? CupertinoIcons.eye_slash
+                              : CupertinoIcons.eye,
+                          isActive: appState.discreetMode,
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            appState.toggleDiscreetMode();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+
+          // Conteúdo da aba ativa com transição suave
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: activeTabBody,
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Novo Lançamento',
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.iosBlue,
         foregroundColor: Colors.white,
-        elevation: 3,
+        elevation: 0,
+        focusElevation: 0,
+        hoverElevation: 0,
+        highlightElevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
         ),
-        onPressed: () => TransactionFormSheet.show(
-          context,
-          appState: appState,
-        ),
-        child: const Icon(Icons.add_rounded, size: 28),
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          TransactionFormSheet.show(
+            context,
+            appState: appState,
+          );
+        },
+        child: const Icon(CupertinoIcons.add, size: 26),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface(context),
-          border: Border(
-            top: BorderSide(
-              color: AppColors.border(context),
-              width: 0.8,
-            ),
+      bottomNavigationBar: HigFrostedSurface(
+        border: Border(
+          top: BorderSide(
+            color: AppColors.border(context),
+            width: AppSpacing.hairlineBorder,
           ),
         ),
         child: NavigationBar(
@@ -172,54 +182,54 @@ class MainShell extends StatelessWidget {
           elevation: 0,
           selectedIndex: tabIdx,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          indicatorColor: AppColors.primary.withValues(alpha: 0.14),
+          indicatorColor: AppColors.iosBlue.withValues(alpha: 0.12),
           onDestinationSelected: (idx) {
-            HapticFeedback.selectionClick();
+            HapticFeedback.lightImpact();
             appState.setActiveTab(idx);
           },
           destinations: const [
             NavigationDestination(
-              icon: Icon(Icons.pie_chart_outline_rounded, size: 22),
+              icon: Icon(CupertinoIcons.chart_pie, size: 21),
               selectedIcon: Icon(
-                Icons.pie_chart_rounded,
-                size: 22,
-                color: AppColors.primary,
+                CupertinoIcons.chart_pie_fill,
+                size: 21,
+                color: AppColors.iosBlue,
               ),
               label: 'Resumo',
             ),
             NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined, size: 22),
+              icon: Icon(CupertinoIcons.doc_text, size: 21),
               selectedIcon: Icon(
-                Icons.receipt_long_rounded,
-                size: 22,
-                color: AppColors.primary,
+                CupertinoIcons.doc_text_fill,
+                size: 21,
+                color: AppColors.iosBlue,
               ),
               label: 'Extrato',
             ),
             NavigationDestination(
-              icon: Icon(Icons.credit_card_outlined, size: 22),
+              icon: Icon(CupertinoIcons.creditcard, size: 21),
               selectedIcon: Icon(
-                Icons.credit_card_rounded,
-                size: 22,
-                color: AppColors.primary,
+                CupertinoIcons.creditcard_fill,
+                size: 21,
+                color: AppColors.iosBlue,
               ),
               label: 'Cartões',
             ),
             NavigationDestination(
-              icon: Icon(Icons.category_outlined, size: 22),
+              icon: Icon(CupertinoIcons.square_grid_2x2, size: 21),
               selectedIcon: Icon(
-                Icons.category_rounded,
-                size: 22,
-                color: AppColors.primary,
+                CupertinoIcons.square_grid_2x2_fill,
+                size: 21,
+                color: AppColors.iosBlue,
               ),
               label: 'Categorias',
             ),
             NavigationDestination(
-              icon: Icon(Icons.settings_outlined, size: 22),
+              icon: Icon(CupertinoIcons.slider_horizontal_3, size: 21),
               selectedIcon: Icon(
-                Icons.settings_rounded,
-                size: 22,
-                color: AppColors.primary,
+                CupertinoIcons.slider_horizontal_3,
+                size: 21,
+                color: AppColors.iosBlue,
               ),
               label: 'Ajustes',
             ),
@@ -245,34 +255,32 @@ class _HeaderActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final activeColor = AppColors.iosBlue;
     return Semantics(
       button: true,
       label: tooltip,
       child: Tooltip(
         message: tooltip,
-        child: Material(
-          color: isActive
-              ? AppColors.primary.withValues(alpha: 0.14)
-              : AppColors.surface(context),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: isActive ? AppColors.primary : AppColors.border(context),
-              width: 0.8,
-            ),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: onTap,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-              child: Icon(
-                icon,
-                size: 20,
-                color: isActive
-                    ? AppColors.primary
-                    : AppColors.textSecondary(context),
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? activeColor.withValues(alpha: 0.12)
+                  : AppColors.surface(context),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isActive ? activeColor : AppColors.border(context),
+                width: AppSpacing.hairlineBorder,
               ),
+            ),
+            child: Icon(
+              icon,
+              size: 19,
+              color: isActive ? activeColor : AppColors.textSecondary(context),
             ),
           ),
         ),
